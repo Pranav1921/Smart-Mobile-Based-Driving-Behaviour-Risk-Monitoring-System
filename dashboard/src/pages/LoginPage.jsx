@@ -1,1 +1,1 @@
-//loginpage.jsx
+export { default } from './LoginPage.tsx';

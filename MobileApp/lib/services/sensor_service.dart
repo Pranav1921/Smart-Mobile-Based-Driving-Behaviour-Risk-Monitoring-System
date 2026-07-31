@@ -1,2 +1,14 @@
-/// Created on 2026-06-14 — added top-line comment.
+import 'dart:async';
+import 'package:sensors_plus/sensors_plus.dart';
 
+class SensorService {
+  SensorService._();
+
+  static Stream<UserAccelerometerEvent> getAccelerometerStream() {
+    return userAccelerometerEvents;
+  }
+
+  static Stream<GyroscopeEvent> getGyroscopeStream() {
+    return gyroscopeEvents;
+  }
+}

@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>स्वदेशी OrderGuard | Indian Delivery Portal</title>
+  <!-- Google Fonts: Yatra One (Devanagari-style Latin calligraphy) & Inter (UI text) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Yatra+One&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --primary-blue: #0038ff;
+      --primary-blue-hover: #0026b3;
+      --saffron-orange: #ff6f00;
+      --light-bg: #f8fafc;
+      --card-bg: #ffffff;
+      --border-color: #e2e8f0;
+      --text-dark: #0f172a;
+      --text-muted: #64748b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--light-bg);
+      color: var(--text-dark);
+      line-height: 1.5;
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    /* Header & Title Styling */
+    header {
+      text-align: center;
+      margin-bottom: 3rem;
+      position: relative;
+    }
+
+    .brand-title {
+      font-family: 'Yatra One', cursive;
+      font-size: 3.5rem;
+      color: var(--primary-blue);
+      text-shadow: 2px 2px 0px rgba(255, 111, 0, 0.15);
+      letter-spacing: 2px;
+      display: inline-block;
+      position: relative;
+      margin-bottom: 0.5rem;
+    }
+
+    .brand-title::after {
+      content: '';
+      display: block;
+      width: 60%;
+      height: 4px;
+      background: linear-gradient(90deg, var(--saffron-orange), var(--primary-blue));
+      margin: 0.5rem auto 0 auto;
+      border-radius: 2px;
+    }
+
+    .subtitle {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+    }
+
+    /* Main Grid Split */
+    .grid {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 2.5rem;
+    }
+
+    @media (max-width: 900px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Card styling based on piSignage */
+    .card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 2rem;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .card:hover {
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+    }
+
+    .section-title {
+      font-size: 1.5rem;
+      font-weight: 800;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 0.75rem;
+    }
+
+    .section-title span.badge {
+      font-size: 0.8rem;
+      background-color: var(--primary-blue);
+      color: white;
+      padding: 0.25rem 0.6rem;
+      border-radius: 20px;
+    }
+
+    /* Menu Items Grid */
+    .menu-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    @media (max-width: 600px) {
+      .menu-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .menu-item {
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.25rem;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .menu-item::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background-color: var(--border-color);
+      transition: background-color 0.2s;
+    }
+
+    .menu-item.selected {
+      border-color: var(--primary-blue);
+      background-color: rgba(0, 56, 255, 0.02);
+    }
+
+    .menu-item.selected::before {
+      background-color: var(--primary-blue);
+    }
+
+    .item-name {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+    }
+
+    .item-desc {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 1rem;
+    }
+
+    .item-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .item-price {
+      font-size: 1.2rem;
+      font-weight: 800;
+      color: var(--saffron-orange);
+    }
+
+    .select-indicator {
+      font-size: 0.8rem;
+      font-weight: 800;
+      color: var(--text-muted);
+      border: 1.5px solid var(--border-color);
+      padding: 0.25rem 0.5rem;
+      border-radius: 8px;
+      transition: all 0.2s;
+    }
+
+    .menu-item.selected .select-indicator {
+      background-color: var(--primary-blue);
+      color: white;
+      border-color: var(--primary-blue);
+    }
+
+    /* Form Fields */
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border: 1.5px solid var(--border-color);
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--primary-blue);
+      box-shadow: 0 0 0 3px rgba(0, 56, 255, 0.08);
+    }
+
+    /* Buttons */
+    .btn {
+      width: 100%;
+      background-color: var(--primary-blue);
+      color: white;
+      border: none;
+      padding: 1rem;
+      font-size: 1rem;
+      font-weight: 800;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.25s;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .btn:hover {
+      background-color: var(--primary-blue-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 56, 255, 0.2);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    /* Orders History Log */
+    .order-log {
+      margin-top: 2rem;
+    }
+
+    .order-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      max-height: 480px;
+      overflow-y: auto;
+      padding-right: 0.5rem;
+    }
+
+    .order-card {
+      border: 1px solid var(--border-color);
+      background-color: #fafbfc;
+      border-radius: 12px;
+      padding: 1.25rem;
+      position: relative;
+    }
+
+    .order-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+      font-size: 0.9rem;
+    }
+
+    .order-id {
+      font-weight: 700;
+      color: var(--primary-blue);
+    }
+
+    .order-date {
+      color: var(--text-muted);
+    }
+
+    .order-details {
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+
+    .order-words {
+      font-size: 0.8rem;
+      font-style: italic;
+      color: var(--saffron-orange);
+      margin-bottom: 0.75rem;
+      font-weight: 600;
+    }
+
+    .order-loc {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      background-color: #f1f5f9;
+      padding: 0.4rem 0.60rem;
+      border-radius: 6px;
+      width: fit-content;
+    }
+
+    /* Alert / Notification modal */
+    #alertBox {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background-color: #10b981;
+      color: white;
+      padding: 1rem 2rem;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+      font-weight: bold;
+      z-index: 100;
+      opacity: 0;
+      transform: translateY(20px);
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      pointer-events: none;
+    }
+
+    #alertBox.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand-title">स्वदेशी OrderGuard</div>
+      <div class="subtitle">Indian Fleet Delivery Testing Hub</div>
+    </header>
+
+    <div class="grid">
+      <!-- Ordering Panel -->
+      <div class="card">
+        <h2 class="section-title"><span>🛒</span> Place a Swadeshi Dispatch Order</h2>
+        
+        <!-- Menu -->
+        <h3 style="font-size: 1.05rem; font-weight: 800; margin-bottom: 1rem; color: var(--text-muted)">SELECT DISPATCH PARCEL CONTENT</h3>
+        <div class="menu-grid">
+          <div class="menu-item selected" onclick="selectItem(this, 'Masala Chai Bulk Sack', 1850)">
+            <div>
+              <div class="item-name">Masala Chai Sack</div>
+              <div class="item-desc">Premium Assam tea leaves blended with Indian spices.</div>
+            </div>
+            <div class="item-footer">
+              <div class="item-price">₹1,850</div>
+              <div class="select-indicator">SELECTED</div>
+            </div>
+          </div>
+
+          <div class="menu-item" onclick="selectItem(this, 'Deccani Samosa Box', 4500)">
+            <div>
+              <div class="item-name">Deccani Samosas</div>
+              <div class="item-desc">Bulk catering pack of traditional crispy potato Samosas.</div>
+            </div>
+            <div class="item-footer">
+              <div class="item-price">₹4,500</div>
+              <div class="select-indicator">SELECT</div>
+            </div>
+          </div>
+
+          <div class="menu-item" onclick="selectItem(this, 'Kashmiri Saffron Tin', 125000)">
+            <div>
+              <div class="item-name">Kashmiri Saffron</div>
+              <div class="item-desc">Ultra-pure Grade-A Pampore saffron threads (50g).</div>
+            </div>
+            <div class="item-footer">
+              <div class="item-price">₹1.25 Lakh</div>
+              <div class="select-indicator">SELECT</div>
+            </div>
+          </div>
+
+          <div class="menu-item" onclick="selectItem(this, 'Konkan Alphonsos Crate', 9200)">
+            <div>
+              <div class="item-name">Alphonso Mango Crate</div>
+              <div class="item-desc">Premium Ratnagiri Alphonsos packed in wooden crate.</div>
+            </div>
+            <div class="item-footer">
+              <div class="item-price">₹9,200</div>
+              <div class="select-indicator">SELECT</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Details Form -->
+        <form id="orderForm" onsubmit="submitOrder(event)">
+          <div class="form-group">
+            <label for="custName">Customer / Consignee Name</label>
+            <input type="text" id="custName" placeholder="e.g. Ramesh Kumar Patel" required>
+          </div>
+
+          <div class="form-group">
+            <label for="deliveryLocation">Indian Depot Hub Location (Telemetry GPS)</label>
+            <select id="deliveryLocation" onchange="updateLocationFields()">
+              <option value="gateway" data-lat="18.9220" data-lng="72.8347" data-addr="Gateway of India, Colaba, Mumbai, Maharashtra 400001">Gateway of India, Mumbai (West)</option>
+              <option value="connaught" data-lat="28.6304" data-lng="77.2177" data-addr="Connaught Place, Radial Road 1, New Delhi, Delhi 110001">Connaught Place, New Delhi (North)</option>
+              <option value="howrah" data-lat="22.5851" data-lng="88.3416" data-addr="Howrah Bridge Approach Road, Kolkata, West Bengal 700001">Howrah Bridge, Kolkata (East)</option>
+              <option value="charminar" data-lat="17.3616" data-lng="78.4747" data-addr="Charminar Rd, Hyderabad, Telangana 500002">Charminar, Hyderabad (South)</option>
+              <option value="brigade" data-lat="12.9738" data-lng="77.6074" data-addr="Brigade Road Crossing, Bengaluru, Karnataka 560001">Brigade Road, Bengaluru (Central)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="fullAddr">Custom Dispatch Address</label>
+            <textarea id="fullAddr" rows="3" required></textarea>
+          </div>
+
+          <button type="submit" class="btn">🚀 Dispatch & Place Order</button>
+        </form>
+      </div>
+
+      <!-- Real-time Order Log -->
+      <div class="card">
+        <h2 class="section-title"><span>📋</span> Dispatch Log <span class="badge" id="orderCount">0</span></h2>
+        <div class="order-list" id="orderList">
+          <p style="text-align: center; color: var(--text-muted); font-size: 0.9rem; margin-top: 2rem;">No orders dispatched yet.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="alertBox">Order Dispatched to Depot!</div>
+
+  <script>
+    let selectedItemName = "Masala Chai Bulk Sack";
+    let selectedItemPrice = 1850;
+
+    // Helper to select parcel item
+    function selectItem(elem, name, price) {
+      document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('selected'));
+      document.querySelectorAll('.select-indicator').forEach(el => el.textContent = 'SELECT');
+      
+      elem.classList.add('selected');
+      elem.querySelector('.select-indicator').textContent = 'SELECTED';
+      selectedItemName = name;
+      selectedItemPrice = price;
+    }
+
+    // Translate number to Indian Currency words (Rupees Only)
+    function numberToIndianRupeesWords(num) {
+      const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
+      const b = ['', '', 'Twenty ', 'Thirty ', 'Forty ', 'Fifty ', 'Sixty ', 'Seventy ', 'Eighty ', 'Ninety '];
+
+      if ((num = num.toString()).length > 9) return 'overflow';
+      let n = ('000000000' + num).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
+      if (!n) return ''; 
+      
+      let str = '';
+      str += (Number(n[1]) != 0) ? (a[Number(n[1])] || b[Number(n[1].substr(0, 1))] + a[Number(n[1].substr(1))]) + 'Crore ' : '';
+      str += (Number(n[2]) != 0) ? (a[Number(n[2])] || b[Number(n[2].substr(0, 1))] + a[Number(n[2].substr(1))]) + 'Lakh ' : '';
+      str += (Number(n[3]) != 0) ? (a[Number(n[3])] || b[Number(n[3].substr(0, 1))] + a[Number(n[3].substr(1))]) + 'Thousand ' : '';
+      str += (Number(n[4]) != 0) ? (a[Number(n[4])] || b[Number(n[4].substr(0, 1))] + a[Number(n[4].substr(1))]) + 'Hundred ' : '';
+      str += (Number(n[5]) != 0) ? ((str != '') ? 'and ' : '') + (a[Number(n[5])] || b[Number(n[5].substr(0, 1))] + a[Number(n[5].substr(1))]) + 'Rupees ' : 'Rupees ';
+      
+      return str + 'Only';
+    }
+
+    // Update address block on select change
+    function updateLocationFields() {
+      const select = document.getElementById('deliveryLocation');
+      const opt = select.options[select.selectedIndex];
+      document.getElementById('fullAddr').value = opt.getAttribute('data-addr');
+    }
+
+    // Submit Order to backend API
+    async function submitOrder(e) {
+      e.preventDefault();
+      const customerName = document.getElementById('custName').value.trim();
+      const address = document.getElementById('fullAddr').value.trim();
+      
+      const select = document.getElementById('deliveryLocation');
+      const opt = select.options[select.selectedIndex];
+      const latitude = opt.getAttribute('data-lat');
+      const longitude = opt.getAttribute('data-lng');
+
+      const orderPayload = {
+        customerName,
+        items: [selectedItemName],
+        amount: selectedItemPrice,
+        deliveryLocation: {
+          latitude: parseFloat(latitude),
+          longitude: parseFloat(longitude),
+          address: address
+        }
+      };
+
+      try {
+        const res = await fetch('http://localhost:3000/api/v1/orders', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(orderPayload)
+        });
+
+        if (res.ok) {
+          showAlert();
+          document.getElementById('custName').value = '';
+          fetchOrders();
+        } else {
+          console.error("Failed to place order:", await res.text());
+        }
+      } catch (err) {
+        console.error("Error submitting order to API:", err);
+      }
+    }
+
+    // Load orders list from API
+    async function fetchOrders() {
+      try {
+        const res = await fetch('http://localhost:3000/api/v1/orders');
+        if (!res.ok) return;
+        const result = await res.json();
+        const orders = result.data || [];
+        
+        const listDiv = document.getElementById('orderList');
+        document.getElementById('orderCount').textContent = orders.length;
+
+        if (orders.length === 0) {
+          listDiv.innerHTML = `<p style="text-align: center; color: var(--text-muted); font-size: 0.9rem; margin-top: 2rem;">No orders dispatched yet.</p>`;
+          return;
+        }
+
+        listDiv.innerHTML = orders.reverse().map(order => {
+          const dateStr = new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          const rupeeWords = numberToIndianRupeesWords(order.amount);
+          
+          return `
+            <div class="order-card">
+              <div class="order-header">
+                <span class="order-id">${order.id}</span>
+                <span class="order-date">${dateStr}</span>
+              </div>
+              <div class="order-details">${order.customerName} ordered <strong>${order.items.join(', ')}</strong></div>
+              <div class="order-words">Valued at: ₹${order.amount.toLocaleString('en-IN')} (${rupeeWords})</div>
+              <div class="order-loc">
+                📍 <strong>Depot:</strong> ${order.deliveryLocation.address}
+              </div>
+            </div>
+          `;
+        }).join('');
+
+      } catch (err) {
+        console.error("Error fetching orders:", err);
+      }
+    }
+
+    // Trigger toast notification
+    function showAlert() {
+      const box = document.getElementById('alertBox');
+      box.classList.add('show');
+      setTimeout(() => box.classList.remove('show'), 2500);
+    }
+
+    // Initialize fields & load logs
+    updateLocationFields();
+    fetchOrders();
+    // Poll every 4 seconds to update orders list
+    setInterval(fetchOrders, 4000);
+  </script>
+</body>
+</html>
