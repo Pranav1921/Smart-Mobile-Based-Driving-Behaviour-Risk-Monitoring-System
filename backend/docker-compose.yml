@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: fleetguard-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: fleetguard_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - fleetguard-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: fleetguard-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    networks:
+      - fleetguard-network
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: fleetguard-backend
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/fleetguard_db?schema=public
+      - REDIS_URL=redis://redis:6379
+      - JWT_ACCESS_SECRET=super-secret-access-key-fleetguard-ai-2026
+      - JWT_REFRESH_SECRET=super-secret-refresh-key-fleetguard-ai-2026
+      - JWT_ACCESS_EXPIRY=15m
+      - JWT_REFRESH_EXPIRY=7d
+      - LOCAL_STORAGE_DIR=/app/uploads
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - uploads-data:/app/uploads
+    networks:
+      - fleetguard-network
+
+volumes:
+  pgdata:
+    driver: local
+  redisdata:
+    driver: local
+  uploads-data:
+    driver: local
+
+networks:
+  fleetguard-network:
+    driver: bridge

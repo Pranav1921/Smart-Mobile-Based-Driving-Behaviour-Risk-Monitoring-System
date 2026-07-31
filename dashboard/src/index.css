@@ -1,0 +1,174 @@
+@import 'tailwindcss';
+@import 'leaflet/dist/leaflet.css';
+
+/* ============================================================
+   FleetGuard AI — White & Green Design System
+   Pure white cards, clean emerald green accents, rounded corners
+   ============================================================ */
+
+@theme {
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-display: 'Sora', 'Inter', system-ui, sans-serif;
+
+  /* Base surfaces */
+  --color-navy-950: #f8fafc;
+  --color-navy-900: #ffffff;
+  --color-navy-850: #ffffff;
+  --color-navy-800: #ffffff;
+  --color-navy-700: #f1f5f9;
+  --color-navy-600: #e2e8f0;
+
+  /* Accents - Clean Emerald Green */
+  --color-cyan: #10b981;
+  --color-cyan-soft: #059669;
+  --color-electric: #10b981;
+  --color-electric-soft: #34d399;
+
+  /* Status */
+  --color-safe: #10b981;
+  --color-warn: #f59e0b;
+  --color-danger: #ef4444;
+  --color-idle: #94a3b8;
+
+  --radius-xl: 1.25rem;
+}
+
+:root {
+  color-scheme: light;
+  --glass-bg: #ffffff;
+  --glass-border: rgba(0, 0, 0, 0.06);
+  --glass-highlight: rgba(255, 255, 255, 1);
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+  --page-bg: #f8fafc;
+}
+
+* {
+  border-color: var(--glass-border);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: var(--page-bg);
+  background-attachment: fixed;
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ---------- Utilities layered on Tailwind ---------- */
+@layer utilities {
+  .text-primary { color: var(--text-primary); }
+  .text-secondary { color: var(--text-secondary); }
+  .text-muted { color: var(--text-muted); }
+
+  .font-display { font-family: var(--font-display); }
+
+  .glass {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-xl);
+    box-shadow: 0 4px 20px -2px rgba(16, 185, 129, 0.08);
+  }
+
+  .glass-hover {
+    transition: box-shadow 0.25s ease, transform 0.25s ease;
+  }
+  .glass-hover:hover {
+    box-shadow: 0 10px 30px -4px rgba(16, 185, 129, 0.16);
+    transform: translateY(-2px);
+  }
+
+  .accent-gradient {
+    background: linear-gradient(135deg, #10b981, #059669);
+  }
+  .text-accent-gradient {
+    background: linear-gradient(120deg, #10b981, #047857);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .ring-glow {
+    box-shadow: 0 4px 14px 0 rgba(16, 185, 129, 0.35);
+  }
+
+  .grid-lines {
+    background-image: linear-gradient(rgba(16, 185, 129, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(16, 185, 129, 0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+}
+
+/* ---------- Scrollbar ---------- */
+::-webkit-scrollbar { width: 7px; height: 7px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(16, 185, 129, 0.25);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(16, 185, 129, 0.5); }
+
+/* ---------- Keyframe animations ---------- */
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 0.9; transform: scale(1.08); }
+}
+@keyframes shimmer {
+  0% { background-position: -800px 0; }
+  100% { background-position: 800px 0; }
+}
+
+.animate-float-slow { animation: float-slow 6s ease-in-out infinite; }
+.animate-pulse-glow { animation: pulse-glow 2.8s ease-in-out infinite; }
+
+.skeleton {
+  background: linear-gradient(90deg, rgba(0,0,0,0.03) 25%, rgba(0,0,0,0.06) 37%, rgba(0,0,0,0.03) 63%);
+  background-size: 800px 100%;
+  animation: shimmer 1.6s infinite linear;
+}
+
+/* ---------- Leaflet clean light theme ---------- */
+.leaflet-container {
+  background: #f8fafc;
+  font-family: var(--font-sans);
+}
+.leaflet-tile {
+  filter: saturate(1.05) brightness(1.02);
+}
+.leaflet-control-zoom a {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border-color: rgba(0,0,0,0.08) !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
+}
+.leaflet-control-zoom a:hover { color: #10b981 !important; background: #f8fafc !important; }
+.leaflet-control-attribution {
+  background: rgba(255, 255, 255, 0.85) !important;
+  color: #64748b !important;
+}
+.leaflet-control-attribution a { color: #10b981 !important; }
+.leaflet-popup-content-wrapper, .leaflet-popup-tip {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid rgba(0,0,0,0.06);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+}
+
+/* Fleet marker */
+.fleet-marker { position: relative; }

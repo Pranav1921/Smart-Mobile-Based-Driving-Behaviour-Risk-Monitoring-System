@@ -1,1 +1,1 @@
-//APP.js
+export { default } from './App.tsx';

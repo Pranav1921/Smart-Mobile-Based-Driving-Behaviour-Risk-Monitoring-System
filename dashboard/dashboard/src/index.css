@@ -1,0 +1,102 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-[#0c0d12] text-slate-100 font-sans overflow-hidden antialiased;
+  }
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Glassmorphism Panels */
+.glass-panel {
+  background: rgba(18, 20, 29, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.glass-panel-light {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Pulse effects for safety alerts */
+@keyframes warning-pulse {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
+    border-color: rgba(239, 68, 68, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 5px rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.2);
+  }
+}
+
+.alert-pulse-critical {
+  animation: warning-pulse 1.5s infinite;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+@keyframes safe-pulse {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 3px rgba(16, 185, 129, 0.05);
+  }
+}
+
+.pulse-safe {
+  animation: safe-pulse 2s infinite;
+}
+
+/* Leaflet dark-mode overrides */
+.leaflet-container {
+  background: #0f111a !important;
+}
+
+.leaflet-popup-content-wrapper {
+  background: rgba(20, 22, 35, 0.95) !important;
+  backdrop-filter: blur(10px);
+  color: #f1f5f9 !important;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px !important;
+  font-family: inherit;
+}
+
+.leaflet-popup-tip {
+  background: rgba(20, 22, 35, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Custom dashboard scroll helper */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

@@ -1,0 +1,345 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  SUPER_ADMIN
+  FLEET_ADMIN
+  FLEET_MANAGER
+  DRIVER
+  SUPPORT
+}
+
+enum VehicleType {
+  SCOOTER
+  MOTORCYCLE
+  CAR
+  PICKUP
+  VAN
+  TRUCK
+}
+
+enum MaintenanceStatus {
+  HEALTHY
+  NEEDS_SERVICE
+  UNDER_MAINTENANCE
+}
+
+enum TripStatus {
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
+enum EventType {
+  HARSH_BRAKING
+  RAPID_ACCELERATION
+  OVERSPEED
+  SHARP_TURN
+  PHONE_USAGE
+  CRASH
+  LOW_BATTERY
+  LOW_NETWORK
+  GPS_LOST
+}
+
+enum Severity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum EmergencyStatus {
+  PENDING
+  DISPATCHED
+  RESOLVED
+  FALSE_ALARM
+}
+
+enum FileType {
+  IMAGE
+  VIDEO
+  DOCUMENT
+}
+
+enum NotificationType {
+  CRASH
+  OVERSPEED
+  BLE_LOST
+  BATTERY_LOW
+  GPS_LOST
+  EMERGENCY
+  SYSTEM
+}
+
+model Organization {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  users         User[]
+  vehicles      Vehicle[]
+  trips         Trip[]
+  events        Event[]
+  crashReports  CrashReport[]
+  media         Media[]
+  notifications Notification[]
+  settings      Settings?
+  auditLogs     AuditLog[]
+
+  @@map("organizations")
+}
+
+model User {
+  id             String   @id @default(uuid()) @db.Uuid
+  email          String   @unique
+  passwordHash   String   @map("password_hash")
+  firstName      String   @map("first_name")
+  lastName       String   @map("last_name")
+  role           Role     @default(DRIVER)
+  organizationId String?  @db.Uuid @map("organization_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization   Organization?  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  driverProfile  Driver?
+  notifications  Notification[]
+  auditLogs      AuditLog[]
+
+  @@map("users")
+}
+
+model Driver {
+  id                    String   @id @default(uuid()) @db.Uuid
+  userId                String   @unique @db.Uuid @map("user_id")
+  licenseNumber         String   @map("license_number")
+  licenseExpiry         DateTime @map("license_expiry")
+  emergencyContactName  String   @map("emergency_contact_name")
+  emergencyContactPhone String   @map("emergency_contact_phone")
+  status                String   @default("ACTIVE") // ACTIVE, INACTIVE, ON_TRIP
+  safetyScore           Float    @default(100.0) @map("safety_score")
+  riskScore             Float    @default(0.0) @map("risk_score")
+  xp                    Int      @default(0)
+  level                 Int      @default(1)
+  streak                Int      @default(0)
+  badges                String[] @default([])
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicleAssignments VehicleAssignment[]
+  trips              Trip[]
+  events             Event[]
+  crashReports       CrashReport[]
+  media              Media[]
+  driverScores       DriverScore[]
+
+  @@map("drivers")
+}
+
+model Vehicle {
+  id                 String            @id @default(uuid()) @db.Uuid
+  organizationId     String            @db.Uuid @map("organization_id")
+  make               String
+  model              String
+  year               Int
+  vehicleType        VehicleType       @map("vehicle_type")
+  licensePlate       String            @unique @map("license_plate")
+  insuranceNumber    String            @map("insurance_number")
+  insuranceExpiry    DateTime          @map("insurance_expiry")
+  registrationNumber String            @map("registration_number")
+  maintenanceStatus  MaintenanceStatus @default(HEALTHY) @map("maintenance_status")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vehicleAssignments VehicleAssignment[]
+  trips              Trip[]
+  crashReports       CrashReport[]
+
+  @@map("vehicles")
+}
+
+model VehicleAssignment {
+  id           String    @id @default(uuid()) @db.Uuid
+  driverId     String    @db.Uuid @map("driver_id")
+  vehicleId    String    @db.Uuid @map("vehicle_id")
+  assignedAt   DateTime  @default(now()) @map("assigned_at")
+  unassignedAt DateTime? @map("unassigned_at")
+
+  driver  Driver  @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@map("vehicle_assignments")
+}
+
+model Trip {
+  id             String     @id @default(uuid()) @db.Uuid
+  driverId       String     @db.Uuid @map("driver_id")
+  vehicleId      String     @db.Uuid @map("vehicle_id")
+  organizationId String     @db.Uuid @map("organization_id")
+  status         TripStatus @default(ONGOING)
+  startTime      DateTime   @default(now()) @map("start_time")
+  endTime        DateTime?  @map("end_time")
+  distance       Float      @default(0.0) // in kilometers
+  duration       Int        @default(0)   // in seconds
+  avgSpeed       Float      @default(0.0) @map("avg_speed") // in km/h
+  maxSpeed       Float      @default(0.0) @map("max_speed") // in km/h
+  polyline       String?    @db.Text
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  driver       Driver        @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  vehicle      Vehicle       @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tripPoints   TripPoint[]
+  events       Event[]
+  crashReports CrashReport[]
+
+  @@map("trips")
+}
+
+model TripPoint {
+  id        String   @id @default(uuid()) @db.Uuid
+  tripId    String   @db.Uuid @map("trip_id")
+  latitude  Float
+  longitude Float
+  speed     Float    // in km/h
+  heading   Float    // heading in degrees (0-360)
+  altitude  Float?
+  timestamp DateTime @default(now())
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId, timestamp])
+  @@map("trip_points")
+}
+
+model Event {
+  id             String    @id @default(uuid()) @db.Uuid
+  tripId         String?   @db.Uuid @map("trip_id")
+  driverId       String    @db.Uuid @map("driver_id")
+  organizationId String    @db.Uuid @map("organization_id")
+  eventType      EventType @map("event_type")
+  severity       Severity  @default(LOW)
+  latitude       Float
+  longitude      Float
+  timestamp      DateTime  @default(now())
+  sensorValues   Json?     @map("sensor_values") // Accelerometer details, etc.
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  trip         Trip?        @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  driver       Driver       @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("events")
+}
+
+model CrashReport {
+  id               String          @id @default(uuid()) @db.Uuid
+  tripId           String?         @db.Uuid @map("trip_id")
+  driverId         String          @db.Uuid @map("driver_id")
+  vehicleId        String          @db.Uuid @map("vehicle_id")
+  organizationId   String          @db.Uuid @map("organization_id")
+  latitude         Float
+  longitude        Float
+  timestamp        DateTime        @default(now())
+  sensorValues     Json            @map("sensor_values")
+  severity         Severity        @default(CRITICAL)
+  emergencyStatus  EmergencyStatus @default(PENDING) @map("emergency_status")
+  aiSummary        String?         @db.Text @map("ai_summary")
+  crashProbability Float?          @map("crash_probability")
+  createdAt        DateTime        @default(now()) @map("created_at")
+
+  trip         Trip?        @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  driver       Driver       @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  vehicle      Vehicle      @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  media        Media[]
+
+  @@map("crash_reports")
+}
+
+model Media {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid @map("organization_id")
+  driverId       String?  @db.Uuid @map("driver_id")
+  crashReportId  String?  @db.Uuid @map("crash_report_id")
+  url            String
+  publicId       String?  @map("public_id")
+  fileType       FileType @map("file_type")
+  purpose        String   // "CRASH_IMAGE", "CRASH_VIDEO", "DRIVER_LICENSE", "VEHICLE_INSURANCE"
+  uploadedAt     DateTime @default(now()) @map("uploaded_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  driver       Driver?      @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  crashReport  CrashReport? @relation(fields: [crashReportId], references: [id], onDelete: SetNull)
+
+  @@map("media")
+}
+
+model Notification {
+  id             String           @id @default(uuid()) @db.Uuid
+  userId         String           @db.Uuid @map("user_id")
+  organizationId String           @db.Uuid @map("organization_id")
+  title          String
+  message        String
+  type           NotificationType
+  isRead         Boolean          @default(false) @map("is_read")
+  createdAt      DateTime         @default(now()) @map("created_at")
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model DriverScore {
+  id          String   @id @default(uuid()) @db.Uuid
+  driverId    String   @db.Uuid @map("driver_id")
+  safetyScore Float    @map("safety_score")
+  riskScore   Float    @map("risk_score")
+  date        DateTime // day/week/month aggregation marker
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  driver Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@map("driver_scores")
+}
+
+model Settings {
+  id                         String   @id @default(uuid()) @db.Uuid
+  organizationId             String   @unique @db.Uuid @map("organization_id")
+  overspeedThreshold         Float    @default(80.0) @map("overspeed_threshold") // km/h
+  harshBrakingThreshold      Float    @default(-3.0) @map("harsh_braking_threshold") // m/s^2
+  rapidAccelerationThreshold Float    @default(3.0) @map("rapid_acceleration_threshold") // m/s^2
+  sharpTurnThreshold         Float    @default(4.0) @map("sharp_turn_threshold") // rad/s
+  createdAt                  DateTime @default(now()) @map("created_at")
+  updatedAt                  DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("settings")
+}
+
+model AuditLog {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String?  @db.Uuid @map("user_id")
+  organizationId String?  @db.Uuid @map("organization_id")
+  action         String
+  details        String?  @db.Text
+  ipAddress      String?  @map("ip_address")
+  timestamp      DateTime @default(now())
+
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@map("audit_logs")
+}

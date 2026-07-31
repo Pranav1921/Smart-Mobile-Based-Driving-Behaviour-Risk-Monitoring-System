@@ -1,4 +1,19 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Location permissions -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>
+
+    <!-- Sensor / Motion permissions -->
+    <uses-permission android:name="android.permission.BODY_SENSORS"/>
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION"/>
+
+    <!-- Camera permission (dashcam) -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+
+    <!-- Network -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="fleet_guard"
         android:name="${applicationName}"
