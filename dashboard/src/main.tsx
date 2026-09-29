@@ -1,9 +1,9 @@
 import React, { StrictMode } from 'react'
 import * as ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
-import { ThemeProvider } from '@/lib/theme'
-import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
-import { SocketProvider } from '@/hooks/SocketContext'
+import { ThemeProvider } from './lib/theme'
+import { ErrorBoundary } from './components/ui/ErrorBoundary'
+import { SocketProvider } from './hooks/SocketContext'
 import App from './App.tsx'
 import './index.css'
 
