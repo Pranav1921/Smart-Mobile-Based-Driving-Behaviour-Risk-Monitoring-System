@@ -11,8 +11,10 @@ hs_err_pid*.log
 
 # Python
 __pycache__/
+**/__pycache__/
 *.pyc
 .venv/
+backend/.venv/
 venv/
 env/
 
@@ -22,7 +24,6 @@ dist/
 *.tsbuildinfo
 .vite/
 **/.vite/
-
 
 # OS
 .DS_Store
