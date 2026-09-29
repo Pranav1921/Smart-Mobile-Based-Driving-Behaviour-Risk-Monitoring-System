@@ -1,18 +1,18 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
-import { AppShell } from '@/components/layout/AppShell'
-import LoginPage from '@/pages/LoginPage.tsx'
-import Dashboard from '@/pages/Dashboard.tsx'
-import LiveMap from '@/pages/LiveMap.tsx'
-import Drivers from '@/pages/Drivers.tsx'
-import Requests from '@/pages/Requests.tsx'
-import Events from '@/pages/Events.tsx'
-import Orders from '@/pages/Orders.tsx'
-import Profile from '@/pages/Profile.tsx'
-import CrashInvestigation from '@/pages/CrashInvestigation.tsx'
-import Reports from '@/pages/Reports.tsx'
-import PublicLiveTrack from '@/pages/PublicLiveTrack.tsx'
-import { SocketProvider, useSocket } from '@/hooks/SocketContext.tsx'
+import { AppShell } from './components/layout/AppShell'
+import LoginPage from './pages/LoginPage'
+import Dashboard from './pages/Dashboard'
+import LiveMap from './pages/LiveMap'
+import Drivers from './pages/Drivers'
+import Requests from './pages/Requests'
+import Events from './pages/Events'
+import Orders from './pages/Orders'
+import Profile from './pages/Profile'
+import CrashInvestigation from './pages/CrashInvestigation'
+import Reports from './pages/Reports'
+import PublicLiveTrack from './pages/PublicLiveTrack'
+import { SocketProvider, useSocket } from './hooks/SocketContext'
 import { 
   TriangleAlert as AlertTriangle, 
   UserCheck, 
@@ -30,8 +30,8 @@ import {
   Siren 
 } from 'lucide-react'
 
-import { DriverDetailModal } from '@/components/drivers/DriverDetailModal'
-import type { Driver } from '@/types'
+import { DriverDetailModal } from './components/drivers/DriverDetailModal'
+import type { Driver } from './types'
 
 export default function App() {
   return (

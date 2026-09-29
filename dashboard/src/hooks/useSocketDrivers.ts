@@ -1,9 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { io } from 'socket.io-client';
-import { Driver, LivePothole, RuleViolation } from '@/types';
-import { GeofenceZone } from '@/types/geofence';
-import { fetchDriversFromApi, fetchPendingDrivers } from '@/lib/apiClient';
-import { isDriverInRegion, getActiveAdminRegionId } from '@/lib/regionMatcher';
+import { Driver, LivePothole, RuleViolation } from '../types';
+import { GeofenceZone } from '../types/geofence';
+import { fetchDriversFromApi, fetchPendingDrivers } from '../lib/apiClient';
+import { isDriverInRegion, getActiveAdminRegionId } from '../lib/regionMatcher';
 
 const SOCKET_URL = window.location.hostname === 'localhost'
   ? 'http://localhost:3000'
