@@ -251,163 +251,6 @@ function externalPinIcon(loc: GeocodedLocation) {
   })
 }
 
-function ExternalLocationMarkerControl({
-  onAddLocation,
-  activeState,
-  activeCountry,
-  isFullMap,
-}: {
-  onAddLocation: (loc: GeocodedLocation) => void
-  activeState?: string
-  activeCountry?: string
-  isFullMap?: boolean
-}) {
-  const map = useMap()
-  const [query, setQuery] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [suggestions, setSuggestions] = useState<GeocodedLocation[]>([])
-  const [showDropdown, setShowDropdown] = useState(false)
-  const [lastResolvedMsg, setLastResolvedMsg] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!query || query.trim().length < 2) {
-      setSuggestions([])
-      setShowDropdown(false)
-      return
-    }
-
-    const timer = setTimeout(async () => {
-      setLoading(true)
-      try {
-        const results = await searchLocationsExternal(query, activeState, activeCountry)
-        setSuggestions(results)
-        setShowDropdown(results.length > 0)
-      } catch (_) {
-        setSuggestions([])
-      } finally {
-        setLoading(false)
-      }
-    }, 300)
-
-    return () => clearTimeout(timer)
-  }, [query, activeState, activeCountry])
-
-  const handleSelectLocation = (loc: GeocodedLocation) => {
-    onAddLocation(loc)
-    setShowDropdown(false)
-    setSuggestions([])
-    setQuery(loc.displayName.split(',')[0])
-    setLastResolvedMsg(`✓ Marked ${loc.displayName.split(',')[0]} (${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}) via ${loc.source.toUpperCase()}`)
-    setTimeout(() => setLastResolvedMsg(null), 4000)
-    map.flyTo([loc.lat, loc.lng], 15, { duration: 1.5 })
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!query.trim()) return
-    setLoading(true)
-    try {
-      const result = await geocodeLocationExternal(query, activeState, activeCountry)
-      if (result) {
-        handleSelectLocation(result)
-      } else {
-        alert(`Could not resolve external coordinates for "${query}". Try adding a district or state name.`)
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <div
-      style={{
-        position: 'absolute',
-        top: '16px',
-        left: isFullMap ? '16px' : '420px',
-        zIndex: 1000,
-        maxWidth: '440px',
-        width: 'calc(100vw - 460px)',
-        minWidth: '280px',
-      }}
-      className="pointer-events-auto transition-all"
-    >
-      <form onSubmit={handleSubmit} className="relative">
-        <div className="flex items-center gap-2 bg-slate-950/90 backdrop-blur-xl border border-amber-500/50 rounded-2xl px-3 py-2 shadow-2xl focus-within:border-amber-400 focus-within:ring-2 focus-within:ring-amber-500/20">
-          <div className="text-amber-400 pl-1">
-            {loading ? <Loader2 size={16} className="animate-spin text-amber-400" /> : <MapPin size={16} />}
-          </div>
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onFocus={() => { if (suggestions.length > 0) setShowDropdown(true) }}
-            placeholder="Mark location by name (e.g. Kadaba, Puttur, Mangalore)..."
-            className="w-full bg-transparent text-xs font-bold text-white outline-none placeholder:text-slate-500"
-          />
-          {query && (
-            <button
-              type="button"
-              onClick={() => { setQuery(''); setSuggestions([]); setShowDropdown(false); }}
-              className="text-slate-400 hover:text-white cursor-pointer p-0.5"
-            >
-              <X size={14} />
-            </button>
-          )}
-          <button
-            type="submit"
-            disabled={loading || !query.trim()}
-            className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-[10px] uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer shadow-md shadow-amber-500/20 whitespace-nowrap"
-          >
-            Mark Pin
-          </button>
-        </div>
-
-        {/* Live Search Suggestions Dropdown */}
-        {showDropdown && suggestions.length > 0 && (
-          <div className="absolute top-full left-0 right-0 mt-1.5 bg-slate-950/95 backdrop-blur-2xl border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden divide-y divide-slate-800/80 max-h-64 overflow-y-auto z-50">
-            <div className="px-3 py-1.5 bg-slate-900/60 text-[9px] font-black uppercase tracking-widest text-slate-400 flex items-center justify-between">
-              <span>External Geocoded Matches</span>
-              <span className="text-amber-400">Select to Mark</span>
-            </div>
-            {suggestions.map((loc, idx) => (
-              <div
-                key={`${loc.lat}-${loc.lng}-${idx}`}
-                onClick={() => handleSelectLocation(loc)}
-                className="px-3.5 py-2.5 hover:bg-amber-500/10 transition-colors cursor-pointer flex items-center justify-between group"
-              >
-                <div className="pr-2 min-w-0">
-                  <div className="text-xs font-bold text-white group-hover:text-amber-300 truncate">
-                    {loc.displayName.split(',')[0]}
-                  </div>
-                  <div className="text-[10px] text-slate-400 truncate">
-                    {loc.displayName}
-                  </div>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <span className="text-[9px] font-mono font-bold text-emerald-400 block">
-                    {loc.lat.toFixed(4)}, {loc.lng.toFixed(4)}
-                  </span>
-                  <span className="text-[8px] uppercase tracking-wider text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded">
-                    {loc.source}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Temporary Notification Banner */}
-        {lastResolvedMsg && (
-          <div className="mt-1.5 px-3 py-1 bg-emerald-500/20 border border-emerald-500/40 rounded-xl text-[10px] font-bold text-emerald-300 flex items-center gap-1.5 shadow-lg animate-in fade-in slide-in-from-top-1">
-            <Sparkles size={11} className="text-emerald-400 flex-shrink-0" />
-            <span className="truncate">{lastResolvedMsg}</span>
-          </div>
-        )}
-      </form>
-    </div>
-  )
-}
-
 export function FleetMap({
   drivers, 
   selectedId, 
@@ -466,18 +309,20 @@ export function FleetMap({
     return regId === activeRegId || regId.includes(activeRegId) || activeRegId.includes(regId)
   })
 
-  // Ensure every active online driver in the region has valid coordinates
-  const validDrivers = regionActiveDrivers.map((d, index) => {
-    let lat = d.location?.lat
-    let lng = d.location?.lng
+  // Only display drivers that are genuinely online and streaming real GPS coordinates
+  const validDrivers = regionActiveDrivers.filter((d) => {
+    if (!d || !d.location) return false
+    const lat = d.location.lat
+    const lng = d.location.lng
     if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) {
-      const offset = (index % 5) * 0.0015
-      return {
-        ...d,
-        location: { lat: fallbackLat + offset, lng: fallbackLng + offset },
-      }
+      return false
     }
-    return d
+    // Filter out synthetic fallback coordinates if driver is offline or has no real telemetry
+    const isDefaultFallback = Math.abs(lat - 12.7749) < 0.0001 && Math.abs(lng - 75.2023) < 0.0001
+    if (isDefaultFallback && (d.status === 'offline' || !d.speed || d.speed === 0)) {
+      return false
+    }
+    return d.status !== 'offline'
   })
 
   useEffect(() => {
@@ -515,18 +360,6 @@ export function FleetMap({
       <FitRegionBounds activeRegion={activeRegion} targetDriver={targetDriver} isFullMap={isFullMap} />
       <LocateControl />
 
-      <ExternalLocationMarkerControl
-        onAddLocation={(newLoc) => {
-          setMarkedLocations((prev) => {
-            const filtered = prev.filter(p => !(Math.abs(p.lat - newLoc.lat) < 0.0001 && Math.abs(p.lng - newLoc.lng) < 0.0001))
-            return [...filtered, newLoc]
-          })
-        }}
-        activeState={activeRegion?.state}
-        activeCountry={activeRegion?.country}
-        isFullMap={isFullMap}
-      />
-
       {/* External Geocoded Locations Marked on the Map */}
       {markedLocations.map((loc, idx) => (
         <Marker
@@ -534,7 +367,7 @@ export function FleetMap({
           position={[loc.lat, loc.lng]}
           icon={externalPinIcon(loc)}
         >
-          <Tooltip direction="top" offset={[0, -25]} permanent className="bg-slate-950/95 border border-amber-500/60 text-white rounded-xl shadow-2xl p-2.5 min-w-[210px]">
+          <Tooltip direction="top" offset={[0, -25]} className="bg-slate-950/95 border border-amber-500/60 text-white rounded-xl shadow-2xl p-2.5 min-w-[210px]">
             <div className="flex items-center justify-between gap-2 pb-1 border-b border-slate-800">
               <span className="text-xs font-black text-amber-400 uppercase tracking-wide truncate">{loc.displayName.split(',')[0]}</span>
               <span className="text-[8px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded">{loc.source}</span>
@@ -578,76 +411,25 @@ export function FleetMap({
       ))}
 
       {activeRegion?.boundaryPolygon && activeRegion.boundaryPolygon.length >= 3 && (
-        <>
-          <Polygon
-            positions={activeRegion.boundaryPolygon}
-            pathOptions={{
-              color: '#10b981',
-              fillColor: '#10b981',
-              fillOpacity: isFullMap ? 0.08 : 0.16,
-              weight: 3.5,
-              dashArray: '8 10',
-              lineCap: 'round',
-              lineJoin: 'round',
-            }}
-          >
-            <Tooltip permanent direction="top" className="bg-slate-950/95 border border-emerald-500/50 text-emerald-300 font-extrabold text-[10px] uppercase tracking-wider px-3 py-1.5 rounded-xl shadow-2xl backdrop-blur-md">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>{activeRegion.name} · Jurisdiction Boundary</span>
-              </div>
-            </Tooltip>
-          </Polygon>
-
-          {/* Regional Command Sector HQ Marker placed on the authoritative region center */}
-          {sectorCenter && !isNaN(sectorCenter[0]) && !isNaN(sectorCenter[1]) && sectorCenter[0] !== 0 && (
-            <Marker
-              position={sectorCenter}
-              icon={L.divIcon({
-                className: 'region-command-marker',
-                iconSize: [180, 44],
-                iconAnchor: [90, 22],
-                html: `
-                  <div style="
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    background: rgba(10, 15, 29, 0.94);
-                    border: 1.5px solid #10b981;
-                    padding: 5px 12px;
-                    border-radius: 9999px;
-                    box-shadow: 0 0 20px rgba(16, 185, 129, 0.45), inset 0 0 10px rgba(16, 185, 129, 0.15);
-                    backdrop-filter: blur(8px);
-                    color: #ffffff;
-                    font-family: Inter, system-ui, sans-serif;
-                    cursor: default;
-                    user-select: none;
-                    white-space: nowrap;
-                  ">
-                    <span style="
-                      width: 9px;
-                      height: 9px;
-                      border-radius: 50%;
-                      background: #10b981;
-                      box-shadow: 0 0 10px #10b981;
-                      display: inline-block;
-                      flex-shrink: 0;
-                      animation: pulse 1.5s infinite;
-                    "></span>
-                    <div style="display: flex; flex-direction: column; line-height: 1.15; text-align: left;">
-                      <span style="font-size: 8px; font-weight: 800; color: #34d399; letter-spacing: 0.08em; text-transform: uppercase;">
-                        SECTOR COMMAND HUB
-                      </span>
-                      <span style="font-size: 11px; font-weight: 900; color: #ffffff; letter-spacing: 0.02em;">
-                        ${activeRegion.name}
-                      </span>
-                    </div>
-                  </div>
-                `,
-              })}
-            />
-          )}
-        </>
+        <Polygon
+          positions={activeRegion.boundaryPolygon}
+          pathOptions={{
+            color: '#10b981',
+            fillColor: '#10b981',
+            fillOpacity: isFullMap ? 0.05 : 0.08,
+            weight: 2,
+            dashArray: '6 8',
+            lineCap: 'round',
+            lineJoin: 'round',
+          }}
+        >
+          <Tooltip direction="top" className="bg-slate-950/95 border border-emerald-500/50 text-emerald-300 font-extrabold text-[10px] uppercase tracking-wider px-3 py-1.5 rounded-xl shadow-2xl backdrop-blur-md">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>{activeRegion.name} · Jurisdiction Boundary</span>
+            </div>
+          </Tooltip>
+        </Polygon>
       )}
 
       {/* Pothole & Rough Road Heatmap Overlay */}

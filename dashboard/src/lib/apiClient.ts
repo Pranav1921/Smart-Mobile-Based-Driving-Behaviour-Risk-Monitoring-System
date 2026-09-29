@@ -232,7 +232,7 @@ export function transformDriverFromDb(d: any): Driver {
     zone: d.user?.zone || d.zone || 'Regional Sector',
     employeeId: driverCodeBadge || d.licenseNumber || `AGENT-${d.id.slice(0,4)}`,
     photo: '',
-    status: (d.status === 'ON_TRIP' || d.isOnline) ? 'safe' : 'offline',
+    status: (d.isOnline && d.latitude && d.longitude && Math.abs(d.latitude - 12.7749) > 0.001) ? 'safe' : 'offline',
     vehicleId: 'v-live',
     vehicleName: appliedVehicle,
     industry: 'Logistics',
@@ -242,8 +242,8 @@ export function transformDriverFromDb(d: any): Driver {
     crashProbability: 0,
     speed: d.speed ?? 0,
     location: {
-      lat: d.latitude ?? 12.7749,
-      lng: d.longitude ?? 75.2023
+      lat: d.latitude || 0,
+      lng: d.longitude || 0
     },
     locationName: d.user?.zone || d.zone || 'Active Sector',
     route: [],
