@@ -534,20 +534,31 @@ export default function Drivers() {
                         {/* Status */}
                         <td className="px-8 py-5">
                           <div className="flex flex-col gap-1 items-start">
-                            <span className={cn(
-                              "font-pixel text-[8px] px-2.5 py-1 rounded border uppercase tracking-wider font-bold flex items-center gap-1.5",
-                              d?.status === 'emergency' 
-                                ? "bg-rose-500/20 border-rose-500/40 text-rose-500 animate-pulse"
-                                : d?.status === 'warning'
-                                ? "bg-amber-500/20 border-amber-500/40 text-amber-500"
-                                : "bg-emerald-500/15 border-emerald-500/30 text-emerald-500"
-                            )}>
+                            {(d as any)?.isDeadZone ? (
+                              <span className="font-pixel text-[8px] px-2.5 py-1 rounded border uppercase tracking-wider font-bold flex items-center gap-1.5 bg-cyan-500/20 border-cyan-500/40 text-cyan-400">
+                                <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-ping" />
+                                📡 DEAD ZONE (GHAT)
+                              </span>
+                            ) : (
                               <span className={cn(
-                                "h-1.5 w-1.5 rounded-full",
-                                d?.status === 'emergency' ? "bg-rose-500 animate-ping" : "bg-emerald-500"
-                              )} />
-                              {STATUS_LABEL[d?.status || 'safe'] || d?.status || 'ACTIVE'}
-                            </span>
+                                "font-pixel text-[8px] px-2.5 py-1 rounded border uppercase tracking-wider font-bold flex items-center gap-1.5",
+                                d?.status === 'emergency' 
+                                  ? "bg-rose-500/20 border-rose-500/40 text-rose-500 animate-pulse"
+                                  : d?.status === 'warning'
+                                  ? "bg-amber-500/20 border-amber-500/40 text-amber-500"
+                                  : d?.status === 'offline'
+                                  ? "bg-slate-500/20 border-slate-500/40 text-slate-400"
+                                  : "bg-emerald-500/15 border-emerald-500/30 text-emerald-500"
+                              )}>
+                                <span className={cn(
+                                  "h-1.5 w-1.5 rounded-full",
+                                  d?.status === 'emergency' ? "bg-rose-500 animate-ping" : d?.status === 'offline' ? "bg-slate-400" : "bg-emerald-500"
+                                )} />
+                                {d?.status === 'emergency' 
+                                  ? ((d as any)?.alertType === 'SOS' ? '🚨 MANUAL SOS' : (d as any)?.alertType === 'CRASH' ? '💥 CRASH IMPACT' : '🚨 SOS ALERT')
+                                  : (STATUS_LABEL[d?.status || 'safe'] || d?.status || 'ACTIVE')}
+                              </span>
+                            )}
                             {(Boolean(d?.deliveryTo || d?.orderItems || d?.destLat != null || d?.status === 'delivery')) && (
                               <span className="font-pixel text-[8px] px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 flex items-center gap-1">
                                 <Truck size={10} /> ON MISSION

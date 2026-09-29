@@ -11,6 +11,10 @@ export interface SocketContextType {
   isConnected: boolean;
   crashAlertDriver: any | null;
   setCrashAlertDriver: (d: any | null) => void;
+  sosAlertDriver: any | null;
+  setSosAlertDriver: (d: any | null) => void;
+  deadZoneToast: { driverName: string; count: number; timestamp: string } | null;
+  dismissDeadZoneToast: () => void;
   driverOnlineToast: string | null;
   jobResponseToast: string | null;
   pingedDrivers: Record<string, { time: number; responded: boolean; timedOut?: boolean }>;
@@ -63,6 +67,10 @@ const defaultContext: SocketContextType = {
   isConnected: false,
   crashAlertDriver: null,
   setCrashAlertDriver: () => {},
+  sosAlertDriver: null,
+  setSosAlertDriver: () => {},
+  deadZoneToast: null,
+  dismissDeadZoneToast: () => {},
   driverOnlineToast: null,
   jobResponseToast: null,
   pingedDrivers: {},

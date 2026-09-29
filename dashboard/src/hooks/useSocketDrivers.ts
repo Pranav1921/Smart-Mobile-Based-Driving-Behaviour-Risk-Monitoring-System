@@ -56,6 +56,8 @@ export function useSocketDrivers(initialMockDrivers: Driver[]) {
   const [ruleViolations, setRuleViolations] = useState<RuleViolation[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [crashAlertDriver, setCrashAlertDriver] = useState<any | null>(null);
+  const [sosAlertDriver, setSosAlertDriver] = useState<any | null>(null);
+  const [deadZoneToast, setDeadZoneToast] = useState<{ driverName: string; count: number; timestamp: string } | null>(null);
   const [driverOnlineToast, setDriverOnlineToast] = useState<string | null>(null);
   const [jobResponseToast, setJobResponseToast] = useState<string | null>(null);
   const [liveFrame, setLiveFrame] = useState<string | null>(null);
@@ -333,6 +335,7 @@ export function useSocketDrivers(initialMockDrivers: Driver[]) {
       if (isDriverInRegion(data, currentRegion)) {
         const enriched = {
           ...data,
+          alertType: data.alertType || 'CRASH',
           alertId: `crash-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
           timestamp: Date.now(),
         };
@@ -340,9 +343,53 @@ export function useSocketDrivers(initialMockDrivers: Driver[]) {
       }
     });
 
+    socket.on('sos_alert', (data: any) => {
+      const currentRegion = getActiveAdminRegionId();
+      if (isDriverInRegion(data, currentRegion)) {
+        const enriched = {
+          ...data,
+          alertType: 'SOS',
+          alertId: `sos-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+          timestamp: Date.now(),
+        };
+        console.log('[Dashboard] 🚨 DRIVER MANUAL SOS ALERT RECEIVED:', enriched);
+        setSosAlertDriver(enriched);
+      }
+    });
+
+    socket.on('deadzone_burst_synced', (data: any) => {
+      console.log('[Dashboard] ⚡ DEAD ZONE BURST SYNC:', data);
+      setDeadZoneToast({
+        driverName: data.driverName || 'Driver',
+        count: data.count || 0,
+        timestamp: new Date().toLocaleTimeString(),
+      });
+      setTimeout(() => setDeadZoneToast(null), 7000);
+
+      if (data.driverId && data.latestLocation) {
+        setLiveDrivers((prev) =>
+          prev.map((d) => {
+            if (d.id === data.driverId || d.userId === data.driverId) {
+              return {
+                ...d,
+                status: d.status === 'emergency' ? 'emergency' : 'safe',
+                location: {
+                  lat: data.latestLocation.lat,
+                  lng: data.latestLocation.lng,
+                },
+                isDeadZone: false,
+              };
+            }
+            return d;
+          })
+        );
+      }
+    });
+
     socket.on('driver_safety_confirmed', (data: any) => {
       console.log('[Dashboard] ✅ Driver safety confirmed event received:', data);
       setCrashAlertDriver(null);
+      setSosAlertDriver(null);
       setBreakdownAlert(null);
       setLiveDrivers((prev) =>
         prev.map((d) => {
@@ -507,6 +554,8 @@ export function useSocketDrivers(initialMockDrivers: Driver[]) {
       socket.off('driver_location_update');
       socket.off('live_frame');
       socket.off('crash_alert');
+      socket.off('sos_alert');
+      socket.off('deadzone_burst_synced');
       socket.off('driver_online');
       socket.off('driver_responded');
       socket.off('driver_no_response');
@@ -576,6 +625,10 @@ export function useSocketDrivers(initialMockDrivers: Driver[]) {
     isConnected,
     crashAlertDriver,
     setCrashAlertDriver,
+    sosAlertDriver,
+    setSosAlertDriver,
+    deadZoneToast,
+    dismissDeadZoneToast: () => setDeadZoneToast(null),
     driverOnlineToast,
     jobResponseToast,
     pingedDrivers,

@@ -21,8 +21,9 @@ class SocketService {
   static Map<String, dynamic>? _lastPendingGpsUpdate;
   static final List<Map<String, dynamic>> _offlineBuffer = [];
   static final List<Map<String, dynamic>> _pendingBreakdownAlerts = [];
-  static int get offlineBufferedCount => _offlineBuffer.length + _pendingBreakdownAlerts.length;
-  static bool get isGhatModeActive => !isConnected && (_offlineBuffer.isNotEmpty || _pendingBreakdownAlerts.isNotEmpty);
+  static final List<Map<String, dynamic>> _pendingSosAlerts = [];
+  static int get offlineBufferedCount => _offlineBuffer.length + _pendingBreakdownAlerts.length + _pendingSosAlerts.length;
+  static bool get isGhatModeActive => !isConnected && (_offlineBuffer.isNotEmpty || _pendingBreakdownAlerts.isNotEmpty || _pendingSosAlerts.isNotEmpty);
 
   static StreamSubscription<String>? _hostSubscription;
   static int _consecutiveErrors = 0;
@@ -90,6 +91,17 @@ class SocketService {
       if (_lastPendingGpsUpdate != null) {
         _socket?.emit('gps_update', _lastPendingGpsUpdate);
         print('[SocketService] 🚀 Initial telemetry transmitted.');
+      }
+
+      // Burst-sync pending SOS panic alerts queued during Ghat / Dead Zone mode
+      if (_pendingSosAlerts.isNotEmpty) {
+        final pendingSos = List<Map<String, dynamic>>.from(_pendingSosAlerts);
+        _pendingSosAlerts.clear();
+        for (final sos in pendingSos) {
+          _socket?.emit('driver_sos_alert', sos);
+          _socket?.emit('sos_alert', sos);
+          print('[SocketService] 🚨 GHAT / DEAD ZONE RECONNECT: Emitted queued SOS alert: ${sos['reason']}');
+        }
       }
 
       // Burst-sync pending Roadside Breakdown alerts queued during Ghat / valley offline mode
@@ -543,8 +555,49 @@ class SocketService {
     }
   }
 
+  static void emitSosAlert({
+    required String driverId,
+    required String driverName,
+    required double lat,
+    required double lng,
+    String? reason,
+    String? phone,
+    String? vehiclePlate,
+    double? speed,
+  }) {
+    final payload = {
+      'id': 'SOS-${DateTime.now().millisecondsSinceEpoch}',
+      'driverId': driverId,
+      'driverName': driverName,
+      'alertType': 'SOS',
+      'reason': reason ?? 'Manual SOS Panic Triggered by Operator',
+      'latitude': lat,
+      'longitude': lng,
+      'speed': speed ?? 0.0,
+      'phone': phone ?? '+91 94812 55667',
+      'vehiclePlate': vehiclePlate ?? 'KA-19-PT-2026',
+      'timestamp': DateTime.now().toUtc().toIso8601String(),
+    };
+    if (_socket != null && _socket!.connected) {
+      _socket?.emit('driver_sos_alert', payload);
+      _socket?.emit('sos_alert', payload);
+      print('[SocketService] 🚨 Driver SOS Panic alert emitted live: ${payload['reason']}');
+    } else {
+      _pendingSosAlerts.add(payload);
+      print('[SocketService] 🚨 Driver SOS Panic alert queued for offline sync (Dead Zone Mode): ${payload['reason']}');
+    }
+  }
+
   static void forceSyncBuffer() {
     if (!isConnected || _socket == null) return;
+    if (_pendingSosAlerts.isNotEmpty) {
+      final pendingSos = List<Map<String, dynamic>>.from(_pendingSosAlerts);
+      _pendingSosAlerts.clear();
+      for (final sos in pendingSos) {
+        _socket?.emit('driver_sos_alert', sos);
+        _socket?.emit('sos_alert', sos);
+      }
+    }
     if (_pendingBreakdownAlerts.isNotEmpty) {
       final pendingAlerts = List<Map<String, dynamic>>.from(_pendingBreakdownAlerts);
       _pendingBreakdownAlerts.clear();

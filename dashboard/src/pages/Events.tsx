@@ -28,7 +28,7 @@ const META: Record<EventType, { icon: React.ElementType; label: string; color: s
 const SEVERITIES: (Severity | 'all')[] = ['all', 'critical', 'high', 'medium', 'low']
 
 export default function Events() {
-  const { liveDrivers, crashAlertDriver, ruleViolations } = useSocket()
+  const { liveDrivers, crashAlertDriver, sosAlertDriver, ruleViolations } = useSocket()
   const [eventList, setEventList] = useState<FleetEvent[]>([])
   const [sev, setSev] = useState<Severity | 'all'>('all')
   const [searchTerm, setSearchTerm] = useState('')
@@ -89,14 +89,14 @@ export default function Events() {
         id: `crash-${Date.now()}`,
         driverId: crashAlertDriver.driverId || crashAlertDriver.id || 'live-driver',
         driverName: crashAlertDriver.driverName || 'Field Operator',
-        vehicleReg: 'KA-19-SOS',
+        vehicleReg: crashAlertDriver.vehiclePlate || 'KA-19-PT-2026',
         type: 'crash',
         severity: 'critical',
         location: {
           lat: crashAlertDriver.latitude ?? 12.7749,
           lng: crashAlertDriver.longitude ?? 75.2023,
         },
-        locationName: crashAlertDriver.reason || 'Incident Telemetry Geofence',
+        locationName: crashAlertDriver.reason || 'Sensor Crash Impact Geofence',
         time: 'Just now',
         value: 'Critical deceleration impact & stillness alert',
       }
@@ -107,6 +107,32 @@ export default function Events() {
       })
     }
   }, [crashAlertDriver])
+
+  // Listen for real-time incoming dedicated SOS panic alerts
+  useEffect(() => {
+    if (sosAlertDriver) {
+      const newEvt: FleetEvent = {
+        id: `sos-${Date.now()}`,
+        driverId: sosAlertDriver.driverId || sosAlertDriver.id || 'live-driver',
+        driverName: sosAlertDriver.driverName || 'Field Operator',
+        vehicleReg: sosAlertDriver.vehiclePlate || 'KA-19-PT-2026',
+        type: 'crash',
+        severity: 'critical',
+        location: {
+          lat: sosAlertDriver.latitude ?? 12.7749,
+          lng: sosAlertDriver.longitude ?? 75.2023,
+        },
+        locationName: sosAlertDriver.reason || 'Manual Driver SOS Panic Beacon',
+        time: 'Just now',
+        value: 'Manual Emergency SOS Panic Triggered by Operator',
+      }
+
+      setEventList((prev) => {
+        if (prev.some((e) => e.id === newEvt.id)) return prev
+        return [newEvt, ...prev]
+      })
+    }
+  }, [sosAlertDriver])
 
   const handleRemoveAll = () => {
     setEventList([])

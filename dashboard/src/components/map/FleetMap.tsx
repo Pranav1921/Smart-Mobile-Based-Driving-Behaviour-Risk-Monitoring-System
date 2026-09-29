@@ -99,9 +99,10 @@ export const MAP_PROVIDERS: Record<string, { name: string; url: string; attribut
 }
 
 function markerIcon(driver: Driver, active: boolean) {
-  const isOffline = driver.status === 'offline'
-  const color = isOffline ? '#64748b' : (STATUS_COLOR[driver.status] || STATUS_COLOR.safe)
-  const pulse = driver.status === 'emergency'
+  const isDeadZone = (driver as any).isDeadZone === true
+  const isOffline = driver.status === 'offline' && !isDeadZone
+  const color = isDeadZone ? '#06b6d4' : isOffline ? '#64748b' : (STATUS_COLOR[driver.status] || STATUS_COLOR.safe)
+  const pulse = driver.status === 'emergency' || isDeadZone
   const size = active ? 48 : 38
   const initial = driver.name ? driver.name.trim().charAt(0).toUpperCase() : 'D'
   return L.divIcon({
@@ -110,14 +111,15 @@ function markerIcon(driver: Driver, active: boolean) {
     iconAnchor: [size / 2, size / 2],
     html: `
       <div style="position:relative;width:${size}px;height:${size}px;display:flex;justify-content:center;align-items:center;">
-        ${pulse ? `<div style="position:absolute;width:${size + 20}px;height:${size + 20}px;border-radius:50%;background:${color};opacity:0.4;animation:pulse 0.8s infinite;"></div>` : ''}
-        ${isOffline ? `<div style="position:absolute;top:-4px;right:-4px;width:14px;height:14px;border-radius:50%;background:#f59e0b;border:2px solid #0f172a;display:flex;align-items:center;justify-content:center;font-size:8px;box-shadow:0 2px 5px rgba(0,0,0,0.5);" title="No Network Zone">📡</div>` : ''}
+        ${pulse ? `<div style="position:absolute;width:${size + 20}px;height:${size + 20}px;border-radius:50%;background:${color};opacity:0.35;animation:pulse 1.2s infinite;"></div>` : ''}
+        ${isDeadZone ? `<div style="position:absolute;top:-6px;right:-6px;padding:1px 4px;border-radius:6px;background:#0891b2;border:1.5px solid #fff;color:#fff;font-size:7.5px;font-weight:900;box-shadow:0 2px 6px rgba(0,0,0,0.6);" title="Dead Zone / Local Buffer Active">📡 DEAD ZONE</div>` : ''}
+        ${isOffline && !isDeadZone ? `<div style="position:absolute;top:-4px;right:-4px;width:14px;height:14px;border-radius:50%;background:#f59e0b;border:2px solid #0f172a;display:flex;align-items:center;justify-content:center;font-size:8px;box-shadow:0 2px 5px rgba(0,0,0,0.5);" title="No Network Zone">📡</div>` : ''}
         <div style="
           width:${size}px;
           height:${size}px;
           border-radius:50%;
           background:${color};
-          border:${isOffline ? '3px dashed #cbd5e1' : '4px solid #ffffff'};
+          border:${isDeadZone ? '3px dashed #38bdf8' : isOffline ? '3px dashed #cbd5e1' : '4px solid #ffffff'};
           opacity:${isOffline ? 0.88 : 1};
           box-shadow: 0 10px 25px rgba(0,0,0,0.3);
           display:flex;
@@ -322,7 +324,9 @@ export function FleetMap({
     if (isDefaultFallback && (d.status === 'offline' || !d.speed || d.speed === 0)) {
       return false
     }
-    return d.status !== 'offline'
+    const isDeadZone = (d as any).isDeadZone === true
+    const isEmergency = d.status === 'emergency'
+    return d.status !== 'offline' || isDeadZone || isEmergency
   })
 
   useEffect(() => {
@@ -531,7 +535,8 @@ export function FleetMap({
       })()}
 
       {validDrivers.map((d) => {
-        const isOffline = d.status === 'offline'
+        const isDeadZone = (d as any).isDeadZone === true
+        const isOffline = d.status === 'offline' && !isDeadZone
         const cleanName = (d.name || 'Driver').replace(/\s+applicant/gi, '').trim()
         return (
           <Marker 
@@ -539,11 +544,16 @@ export function FleetMap({
             position={[d.location.lat, d.location.lng]} 
             icon={markerIcon(d, selectedId === d.id)}
             eventHandlers={{ click: () => onSelect(d.id) }} 
+            zIndexOffset={isDeadZone ? 500 : 0}
           >
-            <Tooltip direction="top" offset={[0, -22]} className="bg-slate-950/95 border border-slate-700 text-white rounded-xl shadow-2xl p-2.5 font-sans min-w-[180px]">
+            <Tooltip direction="top" offset={[0, -22]} className="bg-slate-950/95 border border-slate-700 text-white rounded-xl shadow-2xl p-2.5 font-sans min-w-[190px]">
               <div className="flex items-center justify-between gap-2 pb-1 border-b border-slate-800">
                 <span className="text-xs font-black text-white">{cleanName}</span>
-                {isOffline ? (
+                {isDeadZone ? (
+                  <span className="text-[8px] font-black uppercase tracking-wider bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 px-1.5 py-0.5 rounded">
+                    📡 DEAD ZONE (GHAT)
+                  </span>
+                ) : isOffline ? (
                   <span className="text-[8px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded">
                     📡 NO NETWORK
                   </span>
@@ -554,8 +564,10 @@ export function FleetMap({
                 )}
               </div>
               <div className="text-[10px] text-slate-300 mt-1">
-                {isOffline ? (
-                  <span className="text-amber-400 font-semibold">Last Known Location (Offline Buffer)</span>
+                {isDeadZone ? (
+                  <span className="text-cyan-300 font-bold">Offline Buffer Active • Last Known GPS</span>
+                ) : isOffline ? (
+                  <span className="text-amber-400 font-semibold">Last Known Location (Offline)</span>
                 ) : (
                   <span>Speed: <strong className="text-emerald-400 font-bold">{d.speed || 0} km/h</strong></span>
                 )}

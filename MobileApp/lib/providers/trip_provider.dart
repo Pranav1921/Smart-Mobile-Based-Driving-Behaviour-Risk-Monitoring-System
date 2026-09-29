@@ -2152,13 +2152,20 @@ class TripProvider extends ChangeNotifier {
     _escalateEmergency();
   }
 
-  void _escalateEmergency() {
+  void _escalateEmergency({bool isSos = false}) {
     _verificationStep = 3; // Step 3: Multi-channel Emergency Escalation
-    _isCrashDetected = true;
+    if (!isSos) {
+      _isCrashDetected = true;
+    }
     _isLiveCamActive = true;
     _startLiveCameraStreaming();
-    VoiceService.speak("Step three emergency escalation triggered. Admin dispatcher connected, emergency hotlines queued, family notified.");
-    SocketService.emitEmergencyEscalation(driverId: _currentDriverId ?? 'driver');
+    VoiceService.speak(isSos 
+        ? "Emergency SOS dispatch active. Admin dispatcher notified, family alerted." 
+        : "Step three emergency escalation triggered. Admin dispatcher connected, emergency hotlines queued, family notified.");
+    SocketService.emitEmergencyEscalation(
+      driverId: _currentDriverId ?? 'driver',
+      reason: isSos ? 'Manual SOS Panic Triggered by Operator' : 'Emergency Escalation / Verification Expired',
+    );
     notifyListeners();
   }
 
@@ -2589,7 +2596,7 @@ class TripProvider extends ChangeNotifier {
     _sosCountdownTimer?.cancel();
     _sosCountdownTimer = null;
     _showSOSConfirmation = true;
-    _isCrashDetected = true;
+    _isCrashDetected = false; // Differentiate: Manual SOS Panic, NOT a physical collision crash!
     _crashReason = "Manual SOS Panic Triggered by Operator";
     _sosCountdown = 0;
     _isAdminPinging = false;
@@ -2597,14 +2604,19 @@ class TripProvider extends ChangeNotifier {
     VoiceService.speak("Emergency SOS initiated. Alerting fleet admin and family.");
     NotificationService.cancelCrashNotification();
     lockDashcamEvidence(reason: "Manual SOS Panic Triggered");
-    SocketService.emitCrashAlert(
+    
+    // Dedicated SOS Alert emission (with offline dead zone buffering support)
+    SocketService.emitSosAlert(
       driverId: _currentDriverId ?? 'driver',
-      reason: "Manual SOS Panic Triggered",
-      lat: _currentLat ?? 0.0,
-      lng: _currentLng ?? 0.0,
-      blackBoxData: List<Map<String, dynamic>>.from(_blackBoxBuffer),
+      driverName: _currentDriverName ?? 'Driver',
+      lat: _currentLat ?? 12.7749,
+      lng: _currentLng ?? 75.2023,
+      speed: _currentSpeed,
+      phone: _currentProfile?.phone ?? '+91 94812 55667',
+      vehiclePlate: _currentProfile?.vehicleNumber ?? 'KA-19-PT-2026',
+      reason: "Manual SOS Panic Triggered by Operator",
     );
-    _escalateEmergency();
+    _escalateEmergency(isSos: true);
     notifyListeners();
   }
 

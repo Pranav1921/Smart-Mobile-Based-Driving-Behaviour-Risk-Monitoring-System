@@ -46,6 +46,11 @@ interface LiveDriver {
   harshBrakingCount?: number;
   overspeedCount?: number;
   sharpTurnCount?: number;
+  isDeadZone?: boolean;
+  phone?: string;
+  vehiclePlate?: string;
+  alertType?: string;
+  sosReason?: string;
 }
 
 export interface LivePothole {
@@ -1188,11 +1193,23 @@ export class SocketManager {
               longitude: lng,
               speed: speed,
               isOnline: true,
+              isDeadZone: false,
+              status: existing?.status === 'emergency' ? 'emergency' : 'safe',
               timestamp: latestPoint.timestamp || new Date().toISOString(),
             };
             this.io?.to(orgRoom).to('dashboards').emit('driver_location_update', locUpdate);
             this.io?.to('dashboards').emit('driver_location_update', locUpdate);
             this.io?.emit('driver_location_update', locUpdate);
+
+            // Broadcast deadzone burst sync celebration to dashboards
+            this.io?.to('dashboards').emit('deadzone_burst_synced', {
+              driverId: effectiveUserId,
+              driverName: existing?.name || effectiveUserId,
+              count: validPoints.length,
+              syncedAt: new Date().toISOString(),
+              latestLocation: { lat, lng },
+              points: validPoints,
+            });
           }
         }
       });
@@ -1226,30 +1243,80 @@ export class SocketManager {
       });
 
       // ── DRIVER: Emergency Escalation (Manual SOS or Unanswered Ping) ───────
-      socket.on('emergency_escalation', (data: { driverId?: string; reason?: string }) => {
+      socket.on('emergency_escalation', (data: { driverId?: string; reason?: string; alertType?: string }) => {
         const effectiveUserId = data.driverId || userId;
-        logger.warn(`🚨 EMERGENCY ESCALATION from driver ${effectiveUserId}: ${data.reason || 'SOS Triggered'}`);
+        const isManualSos = data.alertType === 'SOS' || (data.reason && data.reason.toLowerCase().includes('sos'));
+        logger.warn(`🚨 ${isManualSos ? 'MANUAL SOS ESCALATION' : 'EMERGENCY ESCALATION'} from driver ${effectiveUserId}: ${data.reason || 'SOS Triggered'}`);
 
         const existing = liveDrivers.get(effectiveUserId);
         if (existing) {
           existing.status = 'emergency';
+          existing.alertType = isManualSos ? 'SOS' : 'CRASH';
           liveDrivers.set(effectiveUserId, existing);
         }
 
         const orgRoom = `org:${organizationId ?? 'demo-org'}`;
         const alertData = {
+          id: `sos-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+          alertType: isManualSos ? 'SOS' : 'CRASH',
           driverId: effectiveUserId,
           driverName: existing?.name || effectiveUserId,
-          reason: data.reason || 'Emergency SOS Escalation / No Response',
+          reason: data.reason || (isManualSos ? 'Driver Manual SOS Panic Beacon Triggered' : 'Emergency SOS Escalation / No Response'),
           severity: 'CRITICAL',
           latitude: existing?.latitude ?? 12.7749,
           longitude: existing?.longitude ?? 75.2023,
           timestamp: new Date().toISOString(),
         };
 
-        this.io?.to(orgRoom).to('dashboards').emit('driver_no_response', alertData);
-        this.io?.to(orgRoom).to('dashboards').emit('crash_alert', alertData);
+        if (isManualSos) {
+          this.io?.to(orgRoom).to('dashboards').emit('sos_alert', alertData);
+          this.io?.emit('sos_alert', alertData);
+        } else {
+          this.io?.to(orgRoom).to('dashboards').emit('driver_no_response', alertData);
+          this.io?.to(orgRoom).to('dashboards').emit('crash_alert', alertData);
+        }
       });
+
+      // ── DRIVER: Dedicated Manual SOS Panic Alert ───────────────────────────
+      const handleDriverSos = async (data: any) => {
+        const effectiveUserId = data.driverId || userId;
+        logger.warn(`🚨 [MANUAL SOS PANIC] Driver ${effectiveUserId} (${data.driverName || 'Operator'}) triggered SOS at [${data.latitude}, ${data.longitude}]`);
+        
+        const existing = liveDrivers.get(effectiveUserId);
+        if (existing) {
+          existing.status = 'emergency';
+          existing.alertType = 'SOS';
+          existing.sosReason = data.reason || 'Manual SOS Panic Triggered by Operator';
+          liveDrivers.set(effectiveUserId, existing);
+        }
+
+        const orgRoom = `org:${organizationId ?? 'demo-org'}`;
+        const sosData = {
+          id: data.id || `SOS-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+          alertType: 'SOS',
+          driverId: effectiveUserId,
+          driverName: data.driverName || existing?.name || 'Driver',
+          phone: data.phone || data.phoneNumber || (existing as any)?.phone || '+91 94812 55667',
+          vehiclePlate: data.vehiclePlate || (existing as any)?.vehiclePlate || 'KA-19-PT-2026',
+          reason: data.reason || 'Manual SOS Panic Triggered by Operator',
+          severity: 'CRITICAL',
+          latitude: (data.latitude && !isNaN(data.latitude) && data.latitude !== 0) ? data.latitude : (existing?.latitude ?? 12.7749),
+          longitude: (data.longitude && !isNaN(data.longitude) && data.longitude !== 0) ? data.longitude : (existing?.longitude ?? 75.2023),
+          speed: data.speed ?? existing?.speed ?? 0,
+          timestamp: data.timestamp || new Date().toISOString(),
+          status: 'emergency',
+        };
+
+        const googleMapsLink = `https://maps.google.com/?q=${sosData.latitude},${sosData.longitude}`;
+        logger.info(`[SOS PANIC DISPATCH] Emitting SOS Alert for ${sosData.driverName} at ${googleMapsLink}`);
+
+        // Broadcast dedicated sos_alert to all dashboard rooms (NOT crash_alert)
+        this.io?.to(orgRoom).to('dashboards').emit('sos_alert', sosData);
+        this.io?.emit('sos_alert', sosData);
+      };
+
+      socket.on('driver_sos_alert', handleDriverSos);
+      socket.on('sos_alert', handleDriverSos);
 
       // ── DRIVER: crash_detected alias for mobile ────────────────────────────
       socket.on('crash_detected', async (data: any) => {
@@ -1489,15 +1556,23 @@ export class SocketManager {
   }
 
   getLiveDrivers(organizationId?: string): LiveDriver[] {
-    // Auto-purge inactive links (no update in 35 seconds, or offline/phantom)
     const now = Date.now();
     for (const [id, d] of liveDrivers.entries()) {
        if (id === 'agent-x' || id === 'mobile-driver' || d.driverId === 'agent-x' || d.driverId === 'mobile-driver') {
           liveDrivers.delete(id);
           continue;
        }
-       if (now - new Date(d.lastSeen).getTime() > 35000 || !d.isOnline || d.status === 'offline') {
-          liveDrivers.delete(id);
+       const elapsedMs = now - new Date(d.lastSeen).getTime();
+       // In Dead Zone (ghat road / cellular loss), mobile buffers up to 15 minutes
+       if (elapsedMs > 25000 && elapsedMs <= 900000) {
+         // Mark as in dead zone, keep last known coordinate
+         d.isDeadZone = true;
+         if (d.status !== 'emergency') {
+           d.status = 'offline';
+         }
+       } else if (elapsedMs > 900000) {
+         // Purge after 15 minutes of complete inactivity
+         liveDrivers.delete(id);
        }
     }
     const all = Array.from(liveDrivers.values());
