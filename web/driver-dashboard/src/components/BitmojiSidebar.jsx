@@ -1,4 +1,4 @@
-import { X, Phone, Mail, MapPin, Package, AlertTriangle, ShieldCheck, Gauge, User, Briefcase } from 'lucide-react';
+import { X, Phone, Mail, MapPin, Package, TriangleAlert as AlertTriangle, ShieldCheck, Gauge, User, Briefcase } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const DriverProfileSidebar = ({ driver, onClose }) => {

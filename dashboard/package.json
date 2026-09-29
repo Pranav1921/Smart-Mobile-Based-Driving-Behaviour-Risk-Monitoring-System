@@ -1,9 +1,9 @@
 {
-  "name": "fleetguard-ai-dashboard",
+  "name": "smartdrive-admin-dashboard",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "FleetGuard AI — Enterprise AI Fleet Intelligence Admin Dashboard",
+  "description": "Smart Driving Behaviour & Risk Monitoring System — Enterprise AI Intelligence Admin Dashboard",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

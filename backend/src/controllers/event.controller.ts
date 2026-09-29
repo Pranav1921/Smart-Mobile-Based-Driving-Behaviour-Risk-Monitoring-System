@@ -33,10 +33,7 @@ export class EventController {
 
   async getList(req: Request, res: Response, next: NextFunction) {
     try {
-      const orgId = req.user?.organizationId;
-      if (!orgId) {
-        throw new ForbiddenError('Missing organization parameter context');
-      }
+      const orgId = req.user?.organizationId || (req.query.organizationId as string);
 
       const result = await eventService.getEventsList(orgId, req.query);
       res.status(200).json({

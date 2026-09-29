@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ShieldAlert, Search, Filter, AlertTriangle, AlertCircle, Info } from "lucide-react";
+import { ShieldAlert, Search, Filter, TriangleAlert as AlertTriangle, AlertCircle, Info } from "lucide-react";
 import apiClient from "../api/apiClient";
 
 export default function EventsPage() {

@@ -109,9 +109,11 @@ export default function ReportsPage() {
         <div className="bg-[#0e1017] p-8 rounded-3xl border border-white/5 space-y-6">
           <h3 className="text-xs uppercase font-black text-slate-400 tracking-wider">Export Queue Status</h3>
           <div className="space-y-4">
-            <QueueItem label="Job #10294 - SAFETY_AUDIT" status="COMPLETED" date="Today, 11:20 AM" />
-            <QueueItem label="Job #10281 - CRASH_ANALYTICS" status="COMPLETED" date="Yesterday, 4:45 PM" />
-            <QueueItem label="Job #10272 - FLEET_EFFICIENCY" status="COMPLETED" date="July 18, 2026" />
+            <div className="p-6 bg-[#07080d] rounded-2xl border border-white/5 text-center text-xs">
+              <FileText className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+              <p className="font-bold text-slate-300">NO EXPORT JOBS ENQUEUED YET</p>
+              <p className="text-[10px] text-slate-500 font-semibold mt-1">Select parameters above and trigger your first compliance export.</p>
+            </div>
           </div>
         </div>
       </div>

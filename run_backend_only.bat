@@ -1,7 +1,8 @@
 @echo off
-title FleetGuard AI - Backend Services Launcher
+title Smart Driving Behaviour & Risk Monitoring System - Backend Services Launcher
 echo ========================================================
-echo   FleetGuard AI - Setup and Launch Backend Services Only
+echo   Smart Driving Behaviour & Risk Monitoring System
+echo   Setup and Launch Backend Services Only
 echo ========================================================
 echo.
 
@@ -13,7 +14,7 @@ if %errorlevel% neq 0 (
 ) else (
     echo Starting PostgreSQL and Redis containers...
     cd backend
-    start "FleetGuard-Docker" cmd /k "docker-compose up db redis"
+    start "SmartDrive-Docker" cmd /k "docker-compose up db redis"
     cd ..
     timeout /t 5 >nul
 )
@@ -21,27 +22,29 @@ if %errorlevel% neq 0 (
 :: 2. Node.js Backend Gateway Setup & Launch
 echo [2/3] Setting up and starting Node.js Backend Gateway...
 cd backend
-if not exist node_modules (
-    echo Installing npm dependencies for backend...
+if not exist node_modules\ts-node\dist\index.js (
+    echo Incomplete backend packages detected. Reinstalling cleanly...
+    if exist node_modules rd /s /q node_modules
     call npm install
 )
 echo Generating Prisma client...
 call npx prisma generate --schema=src/prisma/schema.prisma
-start "FleetGuard-Backend" cmd /k "npm run dev"
+start "SmartDrive-Backend" cmd /k "npm run dev"
 cd ..
 timeout /t 3 >nul
 
 :: 3. Python FastAPI AI Service Setup & Launch
 echo [3/3] Setting up and starting FastAPI AI Service...
 cd backend
-if not exist venv (
+if not exist venv\Scripts\python.exe (
     echo Creating virtual environment for AI microservice...
     python -m venv venv
-    call venv\Scripts\activate.bat
-    echo Installing pip dependencies...
-    pip install -r requirements.txt
 )
-start "FleetGuard-AI-Service" cmd /k "call venv\Scripts\activate.bat && python -m uvicorn app.main:app --host 0.0.0.0 --port 5000 --reload"
+if not exist venv\Scripts\uvicorn.exe (
+    echo Installing pip dependencies for FastAPI...
+    call venv\Scripts\pip install -r requirements.txt
+)
+start "SmartDrive-AI-Service" cmd /k "call venv\Scripts\activate.bat && venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 5000 --reload"
 cd ..
 timeout /t 3 >nul
 

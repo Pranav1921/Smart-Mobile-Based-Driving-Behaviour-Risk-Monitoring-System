@@ -6,7 +6,7 @@ import { TokenPayload } from '../services/auth.service';
 
 const ACCESS_SECRET =
   process.env.JWT_ACCESS_SECRET ||
-  'super-secret-access-key-fleetguard-ai-2026';
+  'super-secret-access-key-smartdrive-ai-2026';
 
 declare global {
   namespace Express {

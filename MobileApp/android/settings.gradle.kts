@@ -1,3 +1,7 @@
+// Force clear property to resolve ANDROID_PREFS_ROOT / ANDROID_USER_HOME conflict
+System.clearProperty("ANDROID_PREFS_ROOT")
+System.setProperty("ANDROID_USER_HOME", System.getProperty("user.home") + "/.android")
+
 pluginManagement {
     val flutterSdkPath =
         run {
@@ -19,8 +23,8 @@ pluginManagement {
 
 plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
-    id("com.android.application") version "8.11.1" apply false
-    id("org.jetbrains.kotlin.android") version "2.2.20" apply false
+    id("com.android.application") version "8.7.0" apply false
+    id("org.jetbrains.kotlin.android") version "2.1.10" apply false
 }
 
 include(":app")

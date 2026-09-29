@@ -26,8 +26,18 @@ dependencies:
   # Permissions
   permission_handler: ^12.0.1
 
-  # Camera
+  # Camera & Gallery
   camera: ^0.11.2
+  image_picker: ^1.1.2
+
+  # Audio Recording
+  record: ^5.1.0
+  
+  # Video Playback
+  video_player: ^2.9.1
+  
+  # Audio Playback
+  audioplayers: ^6.1.0
 
   # Local Storage
   shared_preferences: ^2.5.3
@@ -36,22 +46,40 @@ dependencies:
   # Maps
   flutter_map: ^8.2.1
   latlong2: ^0.9.1
+  google_maps_flutter: ^2.10.0
+
+  # Data Visualization
+  fl_chart: ^0.70.2
+  syncfusion_flutter_gauges: ^28.2.3
+
+  # Animations
+  confetti: ^0.7.0
+  flutter_animate: ^4.5.2
 
   # Notifications
-  #flutter_local_notifications: ^19.4.1
+  flutter_local_notifications: ^17.2.1+2
 
   # Connectivity
   connectivity_plus: ^7.0.0
   socket_io_client: ^2.0.3
+  flutter_blue_plus: ^1.35.4
 
   # Hardware Alerts
   vibration: ^2.0.0
 
   # Utilities
+  google_fonts: ^6.2.1
+  package_info_plus: ^8.3.0
   intl: ^0.20.2
   uuid: ^4.5.1
+  path: ^1.9.0
   logger: ^2.6.1
   path_provider: ^2.1.5
+  flutter_tts: ^4.2.3
+  flutter_staggered_animations: ^1.0.0
+  url_launcher: ^6.3.1
+  google_nav_bar: ^5.0.7
+  font_awesome_flutter: ^11.0.0
 
 dev_dependencies:
   flutter_test:
@@ -59,8 +87,15 @@ dev_dependencies:
 
   flutter_lints: ^6.0.0
 
+dependency_overrides:
+  record_platform_interface: 1.1.0
+  image_picker_android: 0.8.12+16
+
 flutter:
   uses-material-design: true
 
   assets:
     - assets/
+    - assets/images/
+    - assets/icons/
+    - assets/animations/

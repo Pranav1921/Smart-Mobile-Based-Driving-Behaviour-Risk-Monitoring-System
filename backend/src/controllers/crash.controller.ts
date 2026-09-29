@@ -2,10 +2,10 @@ import { Request, Response, NextFunction } from 'express';
 import { crashService } from '../services/crash.service';
 import { driverRepository } from '../repositories/driver.repository';
 import { ForbiddenError, BadRequestError } from '../utils/app-error';
-import { CloudinaryProvider } from '../storage/cloudinary.provider';
+import { LocalProvider } from '../storage/local.provider';
 import { FileType } from '@prisma/client';
 
-const storage = new CloudinaryProvider();
+const storage = new LocalProvider();
 
 export class CrashController {
   async log(req: Request, res: Response, next: NextFunction) {
@@ -101,14 +101,18 @@ export class CrashController {
   async uploadMedia(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const { fileType } = req.body; // IMAGE or VIDEO
+      const { fileType } = req.body; // IMAGE, VIDEO, or AUDIO
       const file = req.file;
 
       if (!file) {
         throw new BadRequestError('No media file payload was uploaded');
       }
 
-      const mediaType = fileType === 'VIDEO' ? FileType.VIDEO : FileType.IMAGE;
+      let mediaType: FileType;
+      if (fileType === 'VIDEO') mediaType = FileType.VIDEO;
+      else if (fileType === 'AUDIO') mediaType = FileType.AUDIO;
+      else mediaType = FileType.IMAGE;
+
       const media = await crashService.uploadCrashMedia(
         id,
         file,

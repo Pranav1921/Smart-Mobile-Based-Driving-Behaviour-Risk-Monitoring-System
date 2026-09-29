@@ -1,6 +1,6 @@
-# Walkthrough – FleetGuard AI Gamification Complete
+# Walkthrough – Smart Driving AI Gamification Complete
 
-We have completed the implementation of the three missing components of **FleetGuard AI** and connected them to form a unified, commercial-grade telematics ecosystem.
+We have completed the implementation of the components of **Smart Mobile-Based Driving Behaviour & Risk Monitoring System** and connected them to form a unified, commercial-grade telematics ecosystem.
 
 ---
 
@@ -17,34 +17,30 @@ We have completed the implementation of the three missing components of **FleetG
 ### 2. Node.js Backend Gateway Link & Database (`backend/src`)
 * **Redirected Telemetry Audits**: Refactored `ai.service.ts` to make HTTP calls to the FastAPI engine at `${AI_SERVICE_URL}` instead of performing local scoring.
 * **Database Persisted Gamification**: Updated `schema.prisma` and seeds file to persist driver levels, XP totals, streaks, and achievements arrays in PostgreSQL database records.
-* **Swadeshi Ordering Site Serving**: Configured express static routing to serve the Swadeshi dispatch portal statically at `/orders-client/` directly on the Node.js API gateway.
+* **Order Portal Serving**: Configured express static routing to serve the dispatch portal statically at `/orders-client/` directly on the Node.js API gateway.
 
-### 3. Swadeshi Order Portal (`web/orders-client`)
-* **Clean Light Theme Portal**: Developed `index.html` designed with a high-contrast white card grid layout matching the **piSignage** template.
-* **Indian Script Typography**: Uses the **Yatra One** Google Font (`स्वदेशी OrderGuard`) for a beautiful Indian calligraphic branding.
+### 3. Order Portal (`web/orders-client`)
+* **Clean Light Theme Portal**: Developed `index.html` designed with a high-contrast white card grid layout matching the modern dispatch template.
 * **Monetary Word Translators**: Implemented dynamic text converters displaying order values formatted in Indian Rupees (`₹`) and Lakhs/Crores words.
-* **Indian Landmarks Geolocation**: Links checkout coordinates to real hubs (Mumbai, Delhi, Kolkata, Hyderabad, Bengaluru) and posts orders directly to `/api/v1/orders`.
+* **Landmarks Geolocation**: Links checkout coordinates to real hubs (Mumbai, Delhi, Kolkata, Hyderabad, Bengaluru) and posts orders directly to `/api/v1/orders`.
 
 ### 4. React Command Center Dashboard (`dashboard`)
-* **Light Theme Toggle Enforcement**: Forced the React dashboard theme provider to lock to `light` to match the clean white-card style of piSignage.
-* **Indian Branding Title**: Updated brand headers inside `Sidebar.tsx` to `स्वदेशी FleetGuard`.
-* **Swadeshi Orders Console**: Created `Orders.tsx` showing gross dispatches, Indian Rupees accounting logs, and parcel telemetry coordinates.
+* **Light Theme Toggle Enforcement**: Forced the React dashboard theme provider to lock to clean theme.
+* **Driving Risk Console**: Created `Orders.tsx` showing gross dispatches, Indian Rupees accounting logs, and parcel telemetry coordinates.
 
 ### 5. Connected Flutter Driver Client (`MobileApp`)
-* **Forced Light Mode**: Configured `app.dart` to load in `ThemeMode.light` by default.
-* **Clean piSignage Theme**: Overhauled `app_colors.dart` and `app_theme.dart` to use light slate backgrounds (`#F8FAFC`), pure white cards (`#FFFFFF`), and **Royal Blue** (`0xFF0038FF`) branding.
-* **Maximum Contrast Text & Borders**: Configured core colors to use pure solid black (`#000000`) for primary text and dark slate gray (`#94A3B8`) for card borders to guarantee 100% readability.
-* **Flat Minimal Cards**: Removed all `BackdropFilter` blur overlays from `GlassCard` widgets to prevent screen distortion and ensure razor-sharp rendering of texts and inputs.
+* **Overhauled Theme**: Overhauled colors and theme to use modern clean palettes and **Royal Blue** (`0xFF0038FF`) branding.
+* **Maximum Contrast Text & Borders**: Configured core colors to guarantee 100% readability.
 * **Polished Micro-Animations**:
-  - **Light Particle Starfield (No Bubbles)**: Features a clean, delicate, twinkling floating starfield animation with zero background bubbles/radial gradients.
+  - Clean floating starfield animation with zero background bubbles.
   - **Online Pulse**: Toggles a stateful pulsing green glow shadow around the driver status dot when shift is active.
-  - **Elastic Rotation**: Adds a 360-degree elastic spin transition to the active vehicle icon when toggling online telemetry.
+  - **Elastic Rotation**: Adds an elastic spin transition to the active vehicle icon when toggling online telemetry.
 
 ---
 
 ## 🚀 How to Run the Stack
 
-Follow these steps to launch the entire FleetGuard AI environment:
+Follow these steps to launch the entire Smart Driving Behaviour & Risk Monitoring System environment:
 
 ### Step 1: Initialize Database & Caching
 Make sure PostgreSQL and Redis are running. You can run them using Docker:

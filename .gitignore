@@ -1,17 +1,25 @@
-# Flutter
+# Flutter & Android
 .dart_tool/
 .packages
 build/
+MobileApp/build/
+MobileApp/android/.gradle/
+MobileApp/android/app/build/
+MobileApp/android/.kotlin/
+*.log
+hs_err_pid*.log
 
 # Python
 __pycache__/
 *.pyc
 .venv/
+venv/
 env/
 
 # Node
 node_modules/
 dist/
+*.tsbuildinfo
 
 # OS
 .DS_Store
@@ -20,3 +28,25 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+.project
+.settings/
+
+# Environment Variables & Secrets
+.env
+*.env
+.env.*
+!.env.example
+
+# Gradle & Build Caches
+.gradle/
+**/build/
+Esp32SafetyApp/.gradle/
+Esp32SafetyApp/build/
+
+# Logs
+*.log
+**/*.log
+backend/logs/*
+!backend/logs/.gitkeep
+MobileApp/build_info.txt
+MobileApp/build_log.txt

@@ -7,7 +7,13 @@ import {
   refreshSchema,
 } from '../validators/auth.validator';
 
+import { authenticate } from '../middleware/auth.middleware';
+
 const router = Router();
+
+router.post('/driver-apply', authController.applyDriver);
+router.get('/application-status', authController.getApplicationStatus);
+router.post('/change-initial-password', authController.changeInitialPassword);
 
 router.post(
   '/register',
@@ -16,5 +22,6 @@ router.post(
 );
 router.post('/login', validateRequest(loginSchema), authController.login);
 router.post('/refresh', validateRequest(refreshSchema), authController.refresh);
+router.put('/profile', authenticate, authController.updateProfile);
 
 export default router;

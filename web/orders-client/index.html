@@ -265,6 +265,18 @@
       transform: translateY(0);
     }
 
+    .route-preview {
+      margin-top: 1rem;
+    }
+
+    .route-iframe {
+      width: 100%;
+      min-height: 320px;
+      border: 0;
+      border-radius: 14px;
+      margin-top: 1rem;
+    }
+
     /* Orders History Log */
     .order-log {
       margin-top: 2rem;
@@ -356,16 +368,16 @@
   <div class="container">
     <header>
       <div class="brand-title">स्वदेशी OrderGuard</div>
-      <div class="subtitle">Indian Fleet Delivery Testing Hub</div>
+      <div class="subtitle">Simple delivery order test page</div>
     </header>
 
     <div class="grid">
       <!-- Ordering Panel -->
       <div class="card">
-        <h2 class="section-title"><span>🛒</span> Place a Swadeshi Dispatch Order</h2>
+        <h2 class="section-title"><span>🛒</span> Place a delivery order</h2>
         
         <!-- Menu -->
-        <h3 style="font-size: 1.05rem; font-weight: 800; margin-bottom: 1rem; color: var(--text-muted)">SELECT DISPATCH PARCEL CONTENT</h3>
+        <h3 style="font-size: 1.05rem; font-weight: 800; margin-bottom: 1rem; color: var(--text-muted)">Choose a delivery item</h3>
         <div class="menu-grid">
           <div class="menu-item selected" onclick="selectItem(this, 'Masala Chai Bulk Sack', 1850)">
             <div>
@@ -435,6 +447,21 @@
             <textarea id="fullAddr" rows="3" required></textarea>
           </div>
 
+          <div class="form-group">
+            <label for="destLat">Destination Latitude</label>
+            <input type="number" step="any" id="destLat" placeholder="e.g. 12.9716" oninput="updateRoutePreview()">
+          </div>
+          <div class="form-group">
+            <label for="destLng">Destination Longitude</label>
+            <input type="number" step="any" id="destLng" placeholder="e.g. 77.5946" oninput="updateRoutePreview()">
+          </div>
+
+          <div class="form-group route-preview" id="routePreviewSection" style="display:none;">
+            <label style="display:block; margin-bottom:0.5rem; font-size:0.85rem; font-weight:700; letter-spacing:0.5px;">Google Maps Route Preview</label>
+            <a id="routeLink" href="#" target="_blank" class="btn" style="text-decoration:none; display:inline-block;">Open route in Google Maps</a>
+            <iframe id="routeIframe" class="route-iframe" style="display:none;" loading="lazy"></iframe>
+          </div>
+
           <button type="submit" class="btn">🚀 Dispatch & Place Order</button>
         </form>
       </div>
@@ -485,11 +512,47 @@
       return str + 'Only';
     }
 
+    // Build Google Maps route URL for origin/destination
+    function buildRouteUrl(originLat, originLng, destLat, destLng, address) {
+      const origin = `${originLat},${originLng}`;
+      const destination = destLat && destLng ? `${destLat},${destLng}` : encodeURIComponent(address || '');
+      return `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
+    }
+
     // Update address block on select change
     function updateLocationFields() {
       const select = document.getElementById('deliveryLocation');
       const opt = select.options[select.selectedIndex];
       document.getElementById('fullAddr').value = opt.getAttribute('data-addr');
+      updateRoutePreview();
+    }
+
+    function updateRoutePreview() {
+      const select = document.getElementById('deliveryLocation');
+      const opt = select.options[select.selectedIndex];
+      const originLat = opt.getAttribute('data-lat');
+      const originLng = opt.getAttribute('data-lng');
+      const address = document.getElementById('fullAddr').value.trim();
+      const destLat = document.getElementById('destLat').value.trim();
+      const destLng = document.getElementById('destLng').value.trim();
+      const previewSection = document.getElementById('routePreviewSection');
+      const routeLink = document.getElementById('routeLink');
+      const routeIframe = document.getElementById('routeIframe');
+
+      if (!originLat || !originLng || (!address && !destLat && !destLng)) {
+        previewSection.style.display = 'none';
+        routeLink.style.display = 'none';
+        routeIframe.style.display = 'none';
+        return;
+      }
+
+      const url = buildRouteUrl(originLat, originLng, destLat, destLng, address);
+      previewSection.style.display = 'block';
+      routeLink.style.display = 'inline-block';
+      routeLink.href = url;
+      routeLink.textContent = 'Open route in Google Maps';
+      routeIframe.src = url;
+      routeIframe.style.display = 'block';
     }
 
     // Submit Order to backend API
@@ -584,6 +647,7 @@
 
     // Initialize fields & load logs
     updateLocationFields();
+    updateRoutePreview();
     fetchOrders();
     // Poll every 4 seconds to update orders list
     setInterval(fetchOrders, 4000);

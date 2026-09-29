@@ -1,176 +1,239 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Flame, Radio, Layers } from 'lucide-react'
-import { FleetMap } from '@/components/map/FleetMap'
+import { Radio, Layers, MapPin, Crosshair, ChevronRight, Activity, Zap, Shield, ShieldAlert, Smartphone, BatteryLow, SatelliteDish, Flame, Send, Volume2 } from 'lucide-react'
+import { FleetMap, MAP_PROVIDERS } from '@/components/map/FleetMap'
 import { VehiclePanel } from '@/components/map/VehiclePanel'
-import { drivers as seedDrivers, getContextForLocation } from '@/data/mockData'
+import { DispatchOrderModal } from '@/components/map/DispatchOrderModal'
+import { VoiceBroadcastModal } from '@/components/broadcast/VoiceBroadcastModal'
+import { GeofenceModal } from '@/components/map/GeofenceModal'
 import { cn } from '@/lib/utils'
-import type { Driver } from '@/types'
-import { useSocketDrivers } from '@/hooks/useSocketDrivers'
+import { useSocket } from '@/hooks/SocketContext'
+import { getRegionById, getOrGenerateRegion, resolveActiveRegion, type RegionOption, PREDEFINED_REGIONS } from '@/data/regionsData'
+import { isDriverInRegion } from '@/lib/regionMatcher'
 
 const LEGEND = [
-  { c: '#34d399', label: 'Safe' },
-  { c: '#fbbf24', label: 'Warning' },
-  { c: '#f43f5e', label: 'Emergency' },
-  { c: '#60a5fa', label: 'Idle' },
+  { c: '#00FF9D', label: 'Online' },
+  { c: '#F59E0B', label: 'Warning' },
+  { c: '#FF2D55', label: 'SOS' },
+  { c: '#3b82f6', label: 'Standby' },
 ]
 
-interface ComplianceAlert {
-  id: string
-  driverName: string
-  zoneName: string
-  speed: number
-  limit: number
-  type: 'school' | 'traffic'
-  time: string
-}
-
 export default function LiveMap() {
-  const { liveDrivers: drivers, isConnected } = useSocketDrivers(seedDrivers)
+  const { liveDrivers, livePotholes, liveGeofences, emitCreateGeofence, emitDeleteGeofence, isConnected, crashAlertDriver } = useSocket()
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [showHeat, setShowHeat] = useState(false)
-  const [alerts, setAlerts] = useState<ComplianceAlert[]>([])
-  const [mapMode, setMapMode] = useState<'standard' | 'satellite-traffic'>('satellite-traffic')
-  const stepRef = useRef(0)
+  const [hasClosedManually, setHasClosedManually] = useState<boolean>(false)
+  const hasInitialAutoSelectedRef = useRef<boolean>(false)
+  const [mapMode, setMapMode] = useState<string>('google-satellite')
+  const [isFullMap, setIsFullMap] = useState<boolean>(false)
+  const [showPotholes, setShowPotholes] = useState<boolean>(true)
+  const [isDispatchModalOpen, setIsDispatchModalOpen] = useState<boolean>(false)
+  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState<boolean>(false)
+  const [isGeofenceModalOpen, setIsGeofenceModalOpen] = useState<boolean>(false)
 
-  // live movement simulation — nudge active drivers along their route ONLY when socket is disconnected
+  const [selectedRegion, setSelectedRegion] = useState<RegionOption>(() => resolveActiveRegion())
+
   useEffect(() => {
-    if (isConnected) return;
-    const t = setInterval(() => {
-      // We don't have setDrivers anymore, so local simulation is effectively disabled for now.
-      // In a full implementation we'd keep local simulation for mock drivers and update the mock state.
-      // But since we are showing true live integration, we'll just skip simulation when connected.
-    }, 2200)
-    return () => clearInterval(t)
-  }, [isConnected])
-  // Auto-clear alerts after 4.5 seconds
-  useEffect(() => {
-    if (alerts.length > 0) {
-      const timer = setTimeout(() => {
-        setAlerts((prev) => prev.slice(0, -1))
-      }, 4500)
-      return () => clearTimeout(timer)
+    const handleRegionUpdate = () => {
+      setSelectedRegion(resolveActiveRegion())
     }
-  }, [alerts])
+    window.addEventListener('smartdrive_region_updated', handleRegionUpdate)
+    window.addEventListener('storage', handleRegionUpdate)
+    return () => {
+      window.removeEventListener('smartdrive_region_updated', handleRegionUpdate)
+      window.removeEventListener('storage', handleRegionUpdate)
+    }
+  }, [])
 
-  // Check if we redirected here from global alert banner
   useEffect(() => {
-    const targetId = localStorage.getItem('select_driver_id')
+    const params = new URLSearchParams(window.location.search)
+    const urlDriverId = params.get('driverId')
+    const targetId = urlDriverId || localStorage.getItem('select_driver_id')
     if (targetId) {
       setSelectedId(targetId)
+      setHasClosedManually(false)
       localStorage.removeItem('select_driver_id')
     }
   }, [])
 
-  const selected = drivers.find((d) => d.id === selectedId) ?? null
+  useEffect(() => {
+    if (crashAlertDriver?.driverId || crashAlertDriver?.id) {
+      setSelectedId(crashAlertDriver.driverId || crashAlertDriver.id)
+      setHasClosedManually(false)
+    }
+  }, [crashAlertDriver])
+
+  useEffect(() => {
+    const handleOpenDispatch = () => {
+      setIsDispatchModalOpen(true)
+    }
+    window.addEventListener('smartdrive_dispatch_to_coords', handleOpenDispatch)
+    return () => window.removeEventListener('smartdrive_dispatch_to_coords', handleOpenDispatch)
+  }, [])
+
+  const regionalDrivers = useMemo(() => {
+    // Strictly isolate drivers to only the admin's active region and filter out phantom IDs
+    const filtered = liveDrivers.filter(d => isDriverInRegion(d, selectedRegion.id) && d.id !== 'agent-x' && d.id !== 'mobile-driver');
+    const baseList = filtered.length === 0 && liveDrivers.some(d => d.status !== 'offline')
+      ? liveDrivers.filter(d => (d.status !== 'offline' || isDriverInRegion(d, selectedRegion.id)) && d.id !== 'agent-x' && d.id !== 'mobile-driver')
+      : filtered;
+
+    const seen = new Set<string>();
+    return baseList.filter(d => {
+      const key = (d.name || d.id || '').toLowerCase().trim();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [liveDrivers, selectedRegion.id]);
+
+  // Auto-select the first active streaming driver only once on initial load
+  useEffect(() => {
+    if (!hasInitialAutoSelectedRef.current && !selectedId && !hasClosedManually && regionalDrivers.length > 0) {
+      const active = regionalDrivers.find(d => d.status !== 'offline');
+      if (active) {
+        setSelectedId(active.id);
+        hasInitialAutoSelectedRef.current = true;
+      }
+    }
+  }, [regionalDrivers, selectedId, hasClosedManually]);
+
+  const handleSelectDriver = (id: string | null) => {
+    setSelectedId(id)
+    if (id) {
+      setHasClosedManually(false)
+    } else {
+      setHasClosedManually(true)
+    }
+  }
+
+  const selected = regionalDrivers.find((d) => d.id === selectedId) ?? null
 
   return (
-    <div className="relative h-[calc(100vh-4rem)] w-full overflow-hidden">
-      {/* Live Compliance Alerts Toast Stack */}
-      <div className="absolute top-20 right-4 z-[400] flex flex-col gap-2 w-72 pointer-events-none">
-        <AnimatePresence>
-          {alerts.map((alert) => (
-            <motion.div
-              key={alert.id}
-              initial={{ opacity: 0, x: 60, scale: 0.92 }}
-              animate={{ opacity: 1, x: 0, scale: 1 }}
-              exit={{ opacity: 0, x: 60, scale: 0.95 }}
-              className="glass p-3 rounded-2xl border border-rose-500/20 bg-[#0c1224]/95 shadow-2xl pointer-events-auto flex items-start gap-2.5"
+    <div className="h-[calc(100vh-4rem)] w-full overflow-hidden bg-slate-950 relative">
+      <FleetMap
+        drivers={regionalDrivers}
+        selectedId={selectedId}
+        onSelect={handleSelectDriver}
+        showHeat={false}
+        potholes={livePotholes}
+        showPotholes={showPotholes}
+        geofences={liveGeofences}
+        onDeleteGeofence={emitDeleteGeofence}
+        mapMode={mapMode}
+        activeRegion={selectedRegion}
+        isFullMap={isFullMap}
+      />
+
+      {/* SLEEK MINIMAL HUD - TOP LEFT SECTOR & DRIVER SELECTOR */}
+      <div className="absolute top-4 left-4 z-[400] flex items-center gap-2 pointer-events-none">
+        <div className="bg-slate-950/90 backdrop-blur-xl rounded-2xl h-11 px-4 border border-slate-700/60 shadow-2xl pointer-events-auto flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className={cn("w-2.5 h-2.5 rounded-full", isConnected ? "bg-emerald-400 shadow-[0_0_10px_#10b981]" : "bg-rose-500 animate-pulse")} />
+            <span className="text-xs font-black uppercase text-white tracking-wide">{selectedRegion.name}</span>
+          </div>
+          <div className="h-4 w-[1px] bg-slate-700" />
+          <div className="flex items-center gap-1.5">
+            <Crosshair className="h-3.5 w-3.5 text-slate-400" />
+            <select
+              value={selectedId || ''}
+              onChange={(e) => handleSelectDriver(e.target.value || null)}
+              className="bg-transparent text-[11px] font-bold uppercase text-emerald-400 outline-none cursor-pointer pr-1"
             >
-              <div className={cn(
-                'h-8 w-8 rounded-lg grid place-items-center shrink-0 text-sm font-semibold',
-                alert.type === 'school' ? 'bg-amber-500/10 text-amber-300 border border-amber-500/20' : 'bg-rose-500/10 text-rose-300 border border-rose-500/20'
-              )}>
-                {alert.type === 'school' ? '🏫' : '🚨'}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-[12px] font-semibold text-primary truncate">{alert.driverName}</span>
-                  <span className="text-[9px] text-muted font-mono">{alert.time}</span>
-                </div>
-                <div className="text-[10.5px] text-secondary truncate mt-0.5">{alert.zoneName}</div>
-                <div className="text-[11px] text-rose-400 font-medium mt-1">
-                  Speeding: <span className="font-bold">{alert.speed} km/h</span> <span className="text-muted text-[10px]">(Limit: {alert.limit})</span>
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </div>
-
-      <FleetMap drivers={drivers} selectedId={selectedId} onSelect={setSelectedId} showHeat={showHeat} mapMode={mapMode} />
-
-      {/* top-left title & driver selector */}
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-        className="absolute top-4 left-4 z-[400] glass rounded-2xl px-4 py-3 flex items-center gap-4">
-        <div className="grid place-items-center h-9 w-9 rounded-xl accent-gradient ring-glow shrink-0">
-          <Radio className="h-4 w-4 text-white" />
-        </div>
-        <div>
-          <div className="font-display font-semibold text-primary text-sm leading-none">Live Fleet Map</div>
-          <div className="text-[11px] text-muted mt-1.5 flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse-glow" />
-            {drivers.filter((d) => d.status !== 'offline').length} active
+              <option value="" className="bg-slate-900 text-slate-300">All Vehicles ({regionalDrivers.length})</option>
+              {regionalDrivers.map((d) => (
+                <option key={d.id} value={d.id} className="bg-slate-900 text-white font-semibold">
+                  {d.name.toUpperCase()} ({d.status.toUpperCase()})
+                </option>
+              ))}
+            </select>
           </div>
         </div>
-        <div className="border-l border-slate-200 h-7 shrink-0" />
-        <select
-          value={selectedId || ''}
-          onChange={(e) => setSelectedId(e.target.value || null)}
-          className="h-9 rounded-xl bg-white border border-slate-200 text-[12px] text-primary px-3 outline-none focus:border-[#10b981]/40 cursor-pointer shadow-sm"
-        >
-          <option value="" className="bg-white text-slate-400">⚡ Quick select...</option>
-          {drivers.map((d) => (
-            <option key={d.id} value={d.id} className="bg-white text-primary">
-              {d.name} {d.status === 'emergency' ? '🚨 Crash' : d.status === 'warning' ? '⚠️ Warning' : '🟢 Safe'}
-            </option>
-          ))}
-        </select>
-      </motion.div>
-
-      {/* controls */}
-      <div className="absolute top-4 right-4 z-[400] flex flex-col gap-2">
-        <button onClick={() => setShowHeat((h) => !h)}
-          className={cn('glass rounded-xl h-11 px-3.5 flex items-center gap-2 text-[13px] font-medium transition-colors',
-            showHeat ? 'text-rose-600 border-rose-600/30' : 'text-secondary hover:text-primary')}>
-          <Flame className="h-4 w-4" /> Heatmap
-        </button>
-        <div className="glass rounded-xl h-11 px-3.5 flex items-center gap-2 text-[13px] font-medium text-[#10b981] border-[#10b981]/30">
-          <Layers className="h-4 w-4" /> Google Satellite
-        </div>
       </div>
 
-      {/* legend */}
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-        className="absolute bottom-6 left-4 z-[400] glass rounded-2xl px-4 py-3">
-        <div className="text-[10px] uppercase tracking-wider text-muted mb-2">Marker Status</div>
-        <div className="flex items-center gap-4">
-          {LEGEND.map((l) => (
-            <div key={l.label} className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full" style={{ background: l.c, boxShadow: `0 0 8px ${l.c}` }} />
-              <span className="text-[11px] text-secondary">{l.label}</span>
-            </div>
-          ))}
+      {/* SLEEK MINIMAL HUD - TOP RIGHT ACTIONS BAR */}
+      <div className="absolute top-4 right-4 z-[400] flex items-center gap-2 pointer-events-none flex-wrap justify-end">
+        <div className="bg-slate-950/90 backdrop-blur-xl rounded-2xl h-11 pl-3 pr-2 flex items-center gap-2 border border-slate-700/60 shadow-2xl pointer-events-auto">
+          <Layers className="h-3.5 w-3.5 text-sky-400" />
+          <select
+            value={mapMode}
+            onChange={(e) => setMapMode(e.target.value)}
+            className="bg-transparent text-[10px] font-bold uppercase text-white outline-none cursor-pointer pr-2"
+          >
+            {Object.entries(MAP_PROVIDERS).map(([key, provider]) => (
+              <option key={key} value={key} className="bg-slate-900 text-white font-semibold">{provider.name}</option>
+            ))}
+          </select>
         </div>
-      </motion.div>
 
-      {/* driver strip (bottom right) */}
-      {!selected && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-          className="absolute bottom-6 right-4 z-[400] glass rounded-2xl p-2 hidden md:flex gap-1.5 max-w-md overflow-x-auto no-scrollbar">
-          {drivers.filter((d) => d.status !== 'offline').map((d) => (
-            <button key={d.id} onClick={() => setSelectedId(d.id)}
-              className="shrink-0 flex items-center gap-2 px-2.5 py-2 rounded-xl hover:bg-slate-50 transition-colors">
-              <span className={cn('h-2 w-2 rounded-full',
-                d.status === 'safe' ? 'bg-emerald-400' : d.status === 'warning' ? 'bg-amber-400' : d.status === 'emergency' ? 'bg-rose-500' : 'bg-sky-400')} />
-              <span className="text-[12px] text-primary whitespace-nowrap">{d.name.split(' ')[0]}</span>
-              <span className="text-[11px] text-muted">{d.speed}</span>
-            </button>
-          ))}
-        </motion.div>
-      )}
+        <button
+          onClick={() => setIsVoiceModalOpen(true)}
+          className="h-11 px-3.5 rounded-2xl font-black text-[10px] uppercase tracking-wider transition-all shadow-xl pointer-events-auto cursor-pointer bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 text-slate-950 flex items-center gap-1.5 active:scale-95"
+          title="Broadcast Voice Announcement"
+        >
+          <Volume2 size={13} className="animate-pulse" />
+          <span>Voice</span>
+        </button>
 
-      <VehiclePanel driver={selected} onClose={() => setSelectedId(null)} />
+        <button
+          onClick={() => setIsDispatchModalOpen(true)}
+          className="h-11 px-3.5 rounded-2xl font-black text-[10px] uppercase tracking-wider transition-all shadow-xl pointer-events-auto cursor-pointer bg-emerald-500 hover:bg-emerald-400 text-slate-950 flex items-center gap-1.5 active:scale-95"
+        >
+          <Send size={12} />
+          <span>Dispatch</span>
+        </button>
+
+        <button
+          onClick={() => setShowPotholes(!showPotholes)}
+          className={cn(
+            "h-11 px-3.5 rounded-2xl font-black text-[10px] uppercase tracking-wider transition-all shadow-xl pointer-events-auto cursor-pointer border flex items-center gap-1.5 active:scale-95",
+            showPotholes
+              ? "bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-rose-500/20"
+              : "bg-slate-900/90 text-slate-400 border-slate-700 hover:text-white"
+          )}
+        >
+          <span className={cn("w-2 h-2 rounded-full", showPotholes ? "bg-rose-500 animate-ping" : "bg-slate-500")} />
+          <span>Hazards ({livePotholes.length})</span>
+        </button>
+
+        <button
+          onClick={() => setIsFullMap(!isFullMap)}
+          className={cn(
+            "h-11 px-3.5 rounded-2xl font-black text-[10px] uppercase tracking-wider transition-all shadow-xl pointer-events-auto cursor-pointer border-0 active:scale-95",
+            isFullMap
+              ? "bg-sky-400 hover:bg-sky-300 text-slate-950"
+              : "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
+          )}
+        >
+          {isFullMap ? 'Focus' : 'Global'}
+        </button>
+      </div>
+
+      {/* SELECTION PANEL */}
+      <VehiclePanel driver={selected} onClose={() => handleSelectDriver(null)} />
+
+      {/* MISSION DISPATCHER MODAL */}
+      <DispatchOrderModal
+        isOpen={isDispatchModalOpen}
+        onClose={() => setIsDispatchModalOpen(false)}
+        drivers={regionalDrivers}
+        selectedDriverId={selectedId}
+      />
+
+      {/* VOICE INTERCOM BROADCAST MODAL */}
+      <VoiceBroadcastModal
+        isOpen={isVoiceModalOpen}
+        onClose={() => setIsVoiceModalOpen(false)}
+        activeRegionName={selectedRegion.name}
+      />
+
+      {/* DYNAMIC GEOFENCE MODAL */}
+      <GeofenceModal
+        isOpen={isGeofenceModalOpen}
+        onClose={() => setIsGeofenceModalOpen(false)}
+        onSave={(newZone) => emitCreateGeofence(newZone)}
+        initialCoords={selectedRegion.center}
+        activeRegionId={selectedRegion.id}
+      />
     </div>
   )
 }

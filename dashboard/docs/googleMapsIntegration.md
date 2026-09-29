@@ -1,6 +1,6 @@
 # Integrating Google Maps APIs for Driving Rules Compliance
 
-This document explains how the **Context-Aware Driving Compliance Model** implemented on the FleetGuard Admin Dashboard can be connected to real Google Maps Platform APIs in a production backend.
+This document explains how the **Context-Aware Driving Compliance Model** implemented on the SmartDrive Admin Dashboard can be connected to real Google Maps Platform APIs in a production backend.
 
 ```
 +--------------------+

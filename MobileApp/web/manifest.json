@@ -1,11 +1,11 @@
 {
-    "name": "fleet_guard",
-    "short_name": "fleet_guard",
+    "name": "SmartDrive",
+    "short_name": "SmartDrive",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Smart Mobile-Based Driving Behaviour & Risk Monitoring System.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

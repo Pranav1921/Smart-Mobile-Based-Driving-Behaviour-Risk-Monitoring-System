@@ -1,7 +1,11 @@
 import axios from "axios";
 
+const BACKEND_HOST = typeof window !== 'undefined' && window.location.hostname && window.location.hostname !== 'localhost'
+  ? window.location.hostname
+  : 'localhost';
+
 const apiClient = axios.create({
-  baseURL: "http://localhost:3000/api/v1",
+  baseURL: `http://${BACKEND_HOST}:3000/api/v1`,
   headers: {
     "Content-Type": "application/json",
   },

@@ -1,6 +1,5 @@
 import { driverRepository } from '../repositories/driver.repository';
 import { tripRepository } from '../repositories/trip.repository';
-import { EventType } from '@prisma/client';
 import { logger } from '../config/logger';
 
 export interface AISafetyReport {
@@ -46,17 +45,46 @@ export class AIService {
     const aiServiceUrl = process.env.AI_SERVICE_URL || 'http://localhost:5000';
     logger.info(`Forwarding telemetry details to FastAPI AI Engine: ${aiServiceUrl}/api/v1/ai/evaluate-trip`);
     
-    const response = await fetch(`${aiServiceUrl}/api/v1/ai/evaluate-trip`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+    let report: AISafetyReport;
+    try {
+      const response = await fetch(`${aiServiceUrl}/api/v1/ai/evaluate-trip`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
 
-    if (!response.ok) {
-      throw new Error(`FastAPI AI Service evaluation failed with status ${response.status}: ${response.statusText}`);
+      if (!response.ok) {
+        throw new Error(`FastAPI AI Service evaluation failed with status ${response.status}: ${response.statusText}`);
+      }
+
+      report = (await response.json()) as AISafetyReport;
+    } catch (err: any) {
+      logger.warn(`FastAPI AI Service unreachable (${err.message}). Falling back to internal heuristic engine.`);
+      let score = 100;
+      for (const e of events) {
+        if (e.eventType === 'HARSH_BRAKING') score -= 8;
+        else if (e.eventType === 'OVERSPEED') score -= 10;
+        else if (e.eventType === 'RAPID_ACCELERATION') score -= 5;
+        else if (e.eventType === 'SHARP_TURN') score -= 7;
+        else if (e.eventType === 'PHONE_USAGE') score -= 15;
+      }
+      score = Math.max(10, Math.min(100, score));
+      const riskScore = Math.round(100 - score);
+      const classification = score >= 85 ? 'CONSERVATIVE' : score >= 70 ? 'BALANCED' : 'AGGRESSIVE';
+      const xpEarned = Math.round(100 + score * 1.5);
+      const badgesEarned: string[] = [];
+      if (score >= 90) badgesEarned.push('smooth_operator');
+      if (events.length === 0) badgesEarned.push('zero_infractions');
+
+      report = {
+        safetyScore: score,
+        riskScore,
+        behaviorClassification: classification,
+        recommendations: score < 80 ? ['Maintain safe following distance', 'Avoid sudden acceleration'] : ['Excellent driving performance!'],
+        xpEarned,
+        badgesEarned,
+      };
     }
-
-    const report = (await response.json()) as AISafetyReport;
 
     const driverId = trip.driverId;
     const currentDriver = await driverRepository.findById(driverId);
@@ -108,20 +136,28 @@ export class AIService {
     logger.debug(`Generating AI crash report details for incident ${crashReportId}`);
 
     const aiServiceUrl = process.env.AI_SERVICE_URL || 'http://localhost:5000';
-    const response = await fetch(`${aiServiceUrl}/api/v1/ai/generate-crash-summary`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        crash_report_id: crashReportId,
-        sensor_values: sensorValues
-      }),
-    });
+    try {
+      const response = await fetch(`${aiServiceUrl}/api/v1/ai/generate-crash-summary`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          crash_report_id: crashReportId,
+          sensor_values: sensorValues
+        }),
+      });
 
-    if (!response.ok) {
-      throw new Error(`FastAPI AI Service crash analysis failed with status ${response.status}: ${response.statusText}`);
+      if (!response.ok) {
+        throw new Error(`FastAPI AI Service crash analysis failed with status ${response.status}: ${response.statusText}`);
+      }
+
+      return (await response.json()) as { summary: string; crashProbability: number };
+    } catch (err: any) {
+      logger.warn(`FastAPI AI Service unreachable for crash analysis (${err.message}). Using local heuristic summary.`);
+      return {
+        summary: 'Severe deceleration force and structural impact vector detected across active telemetry channels.',
+        crashProbability: 0.92,
+      };
     }
-
-    return (await response.json()) as { summary: string; crashProbability: number };
   }
 }
 export const aiService = new AIService();

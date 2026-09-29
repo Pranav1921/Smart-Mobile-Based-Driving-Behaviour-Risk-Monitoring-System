@@ -11,7 +11,7 @@ const CONFIG: Record<AiInsight['tone'], { icon: React.ElementType; ring: string;
 }
 
 export function AiInsightCard({ insight, index, onClick }: { insight: AiInsight; index: number; onClick?: () => void }) {
-  const c = CONFIG[insight.tone]
+  const c = CONFIG[insight.tone] ?? CONFIG['warning'] ?? CONFIG['info']
   const Icon = c.icon
   return (
     <motion.button
@@ -44,8 +44,8 @@ export function AiSummaryHeader() {
         <Sparkles className="h-4 w-4 text-white" />
       </div>
       <div>
-        <div className="font-display text-[15px] font-semibold text-primary">AI Fleet Summary</div>
-        <div className="text-[11px] text-muted">Updated live · powered by FleetGuard Intelligence</div>
+        <div className="font-display text-[15px] font-semibold text-primary">AI Driving Risk Summary</div>
+        <div className="text-[11px] text-muted">Updated live · powered by Smart Driving AI</div>
       </div>
     </div>
   )

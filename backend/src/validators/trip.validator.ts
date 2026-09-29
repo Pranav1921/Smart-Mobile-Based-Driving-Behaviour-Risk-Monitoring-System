@@ -5,6 +5,10 @@ export const startTripSchema = z.object({
     vehicleId: z
       .string()
       .uuid({ message: 'Target vehicle reference must be a valid UUID' }),
+    deliveryFrom: z.string().optional(),
+    deliveryTo: z.string().optional(),
+    orderItems: z.string().optional(),
+    orderId: z.string().optional(),
   }),
 });
 

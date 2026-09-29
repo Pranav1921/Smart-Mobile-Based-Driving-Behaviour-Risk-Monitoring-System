@@ -1,6 +1,6 @@
-# FleetGuard AI Backend
+# SmartDrive AI Backend
 
-Production-ready backend for **FleetGuard AI** — an AI-powered Smart Mobile-Based Driving Behaviour & Risk Monitoring System.
+Production-ready backend for **SmartDrive AI** — an AI-powered Smart Mobile-Based Driving Behaviour & Risk Monitoring System.
 
 This backend coordinates authentication, fleet/driver profiles, live GPS tracking, telemetry event logging, AI safety score audits, crash reports, and operational PDF/Excel reports. Built on a modular **Clean Architecture** utilizing TypeScript, Node.js, Prisma ORM, and Socket.IO.
 

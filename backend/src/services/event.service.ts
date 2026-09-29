@@ -126,16 +126,16 @@ export class EventService {
   }
 
   async getEventsList(
-    organizationId: string,
+    organizationId?: string,
     query: {
       skip?: number;
       take?: number;
       driverId?: string;
       eventType?: EventType;
       severity?: Severity;
-    }
+    } = {}
   ): Promise<{ events: Event[]; count: number }> {
-    const where: any = { organizationId };
+    const where: any = organizationId ? { organizationId } : {};
     if (query.driverId) {
       where.driverId = query.driverId;
     }

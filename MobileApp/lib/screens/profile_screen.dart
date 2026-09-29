@@ -1,413 +1,478 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../core/constants/app_colors.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../providers/auth_provider.dart';
+import '../providers/trip_provider.dart';
+import '../providers/theme_provider.dart';
+import '../core/theme/hardware_theme.dart';
 import '../routes/app_routes.dart';
-import '../widgets/glass_card.dart';
+import '../services/haptic_service.dart';
+import '../services/sound_effect_service.dart';
+import '../services/voice_service.dart';
+import '../widgets/mechanical_lever_switch.dart';
 
-class ProfilePreset {
-  final String type;
-  final String brandModel;
-  final String plate;
-  final IconData icon;
-
-  ProfilePreset({
-    required this.type,
-    required this.brandModel,
-    required this.plate,
-    required this.icon,
-  });
-}
-
-class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+class ProfileSheet extends StatefulWidget {
+  final bool isEmbedded;
+  const ProfileSheet({super.key, this.isEmbedded = false});
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  State<ProfileSheet> createState() => _ProfileSheetState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
-  // Vehicle Preset Catalog
-  final List<ProfilePreset> _vehiclePresets = [
-    ProfilePreset(type: "Scooter", brandModel: "Ola S1 Pro EV", plate: "MH-12-EV-1024", icon: Icons.electric_scooter),
-    ProfilePreset(type: "Motorcycle", brandModel: "Revolt RV400", plate: "DL-3C-EV-8899", icon: Icons.motorcycle),
-    ProfilePreset(type: "Delivery Bike", brandModel: "Lectrix Cargo EV", plate: "KA-01-EE-3241", icon: Icons.directions_bike),
-    ProfilePreset(type: "Sedan", brandModel: "Tesla Model 3", plate: "FG-101-AI", icon: Icons.directions_car),
-    ProfilePreset(type: "SUV", brandModel: "Tesla Model Y", plate: "FG-202-AI", icon: Icons.electric_car),
-    ProfilePreset(type: "Pickup Truck", brandModel: "Tesla Cybertruck", plate: "FG-303-AI", icon: Icons.airport_shuttle),
-    ProfilePreset(type: "Delivery Van", brandModel: "Rivian EDV 500", plate: "FG-404-AI", icon: Icons.local_shipping),
-    ProfilePreset(type: "Mini Truck", brandModel: "Tata Ace EV", plate: "DL-1L-EV-9001", icon: Icons.local_shipping_outlined),
-    ProfilePreset(type: "Heavy Truck", brandModel: "Volvo FH Electric", plate: "FG-909-AI", icon: Icons.local_shipping),
-  ];
+class _ProfileSheetState extends State<ProfileSheet> {
+  bool _bgUsage = false;
+  bool _biometricAuth = true;
+  bool _emergencyOnlyVoice = true;
+  bool _isOnLeave = false;
 
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
 
-
-  void _showVehicleSelectorSheet(BuildContext context, AuthProvider auth) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
-    final primaryTextColor = isLight ? Colors.black : Colors.white;
-    final secondaryTextColor = isLight ? const Color(0xFF666666) : const Color(0xFF90A4AE);
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) {
-        return Container(
-          decoration: BoxDecoration(
-            color: isLight ? Colors.white : const Color(0xFF16181C),
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(28),
-              topRight: Radius.circular(28),
-            ),
-            border: Border.all(
-              color: isLight ? const Color(0xFFE5E5E5) : AppColors.border,
-              width: 1.5,
-            ),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Align(
-                alignment: Alignment.center,
-                child: Container(
-                  width: 38,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: isLight ? const Color(0xFFCCCCCC) : AppColors.border,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                "SELECT ACTIVE VEHICLE",
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: secondaryTextColor,
-                  letterSpacing: 1.5,
-                ),
-              ),
-              const SizedBox(height: 14),
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(context).size.height * 0.5,
-                ),
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: _vehiclePresets.length,
-                  separatorBuilder: (context, index) => const Divider(),
-                  itemBuilder: (context, index) {
-                    final preset = _vehiclePresets[index];
-                    final isCurrent = auth.profile.vehicleType.toLowerCase() == preset.type.toLowerCase();
-
-                    return ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: isCurrent 
-                              ? (isLight ? Colors.black.withOpacity(0.06) : AppColors.primary.withOpacity(0.1))
-                              : (isLight ? const Color(0xFFF2F3F5) : const Color(0xFF22242B)),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          preset.icon,
-                          color: isCurrent ? (isLight ? Colors.black : AppColors.primary) : secondaryTextColor,
-                          size: 20,
-                        ),
-                      ),
-                      title: Text(
-                        preset.brandModel,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: primaryTextColor,
-                        ),
-                      ),
-                      subtitle: Text(
-                        "${preset.type.toUpperCase()}  •  ${preset.plate}",
-                        style: TextStyle(fontSize: 10, color: secondaryTextColor),
-                      ),
-                      trailing: isCurrent
-                          ? Icon(Icons.check_circle, color: isLight ? Colors.black : AppColors.primary, size: 20)
-                          : const Icon(Icons.arrow_forward_ios, size: 12),
-                      onTap: () async {
-                        await auth.updateVehicle(
-                          type: preset.type,
-                          name: preset.brandModel,
-                          plate: preset.plate,
-                        );
-                        if (context.mounted) {
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text("Active vehicle updated to ${preset.brandModel}"),
-                              backgroundColor: isLight ? Colors.black : AppColors.primary,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                          );
-                        }
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
+  void _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _bgUsage = prefs.getBool('sd_driver_bg_mode') ?? false;
+      _isOnLeave = prefs.getBool('sd_driver_on_leave') ?? false;
+      _emergencyOnlyVoice = VoiceService.emergencyOnlyMode;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
-    final profile = auth.profile;
-    final isLight = Theme.of(context).brightness == Brightness.light;
-    final primaryTextColor = isLight ? Colors.black : Colors.white;
-    final secondaryTextColor = isLight ? const Color(0xFF666666) : const Color(0xFF90A4AE);
+    final trip = Provider.of<TripProvider>(context);
+    final theme = Provider.of<ThemeProvider>(context);
+    final p = auth.profile;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: Text(
-          "DRIVER PROFILE",
-          style: TextStyle(color: primaryTextColor),
-        ),
-      ),
+      backgroundColor: HardwarePalette.chalkChassis,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.only(left: 20, right: 20, top: 10, bottom: 100),
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 110),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // 1. Driver Credentials Card (Nothing Cyber-Driver Style)
-              GlassCard(
+              // ── 1. HARDWARE PASSPORT CARD ────────────────────────────
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: HardwarePalette.milledSurface,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: HardwarePalette.matrixBorderLight, width: 1.2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: HardwarePalette.isDark ? Colors.black.withOpacity(0.2) : Colors.black.withOpacity(0.04),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildScrewRivet(),
+                        Text(
+                          "DRIVER PASSPORT // CREDENTIAL SPEC",
+                          style: GoogleFonts.jetBrainsMono(fontSize: 9.5, fontWeight: FontWeight.bold, color: HardwarePalette.silkscreenSubtle),
+                        ),
+                        _buildScrewRivet(),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Container(
-                          width: 60,
-                          height: 60,
+                          width: 64,
+                          height: 64,
                           decoration: BoxDecoration(
-                            color: isLight ? Colors.black.withOpacity(0.05) : AppColors.primary.withOpacity(0.08),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: isLight ? Colors.black : AppColors.primary,
-                              width: 1.5,
+                            color: HardwarePalette.debossedSlot,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: HardwarePalette.matrixBorderLight),
+                          ),
+                          child: Center(
+                            child: Text(
+                              p.name.isNotEmpty ? p.name[0].toUpperCase() : "D",
+                              style: HardwareTypography.ndotHeader(fontSize: 26, color: HardwarePalette.signalEmerald),
                             ),
                           ),
-                          child: Icon(
-                            Icons.person,
-                            color: isLight ? Colors.black : AppColors.primary,
-                            size: 32,
-                          ),
                         ),
-                        const SizedBox(width: 18),
+                        const SizedBox(width: 14),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                profile.name,
-                                style: TextStyle(
-                                  fontSize: 18,
+                                p.name.isNotEmpty ? p.name.toUpperCase() : "DRIVER",
+                                style: GoogleFonts.outfit(
+                                  fontSize: 17,
                                   fontWeight: FontWeight.bold,
-                                  color: primaryTextColor,
+                                  color: HardwarePalette.silkscreenDark,
+                                  letterSpacing: 0.3,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 3),
+                              // Driver ID in small letters (lowercase)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: HardwarePalette.isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: HardwarePalette.matrixBorderLight,
+                                    width: 0.8,
+                                  ),
+                                ),
+                                child: Text(
+                                  (auth.driverCode ?? p.driverId).toLowerCase(),
+                                  style: GoogleFonts.jetBrainsMono(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: HardwarePalette.signalEmerald,
+                                    letterSpacing: 0.4,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                "ID: ${profile.driverId.toUpperCase()}  •  ${profile.companyCode}",
-                                style: TextStyle(fontSize: 11, color: secondaryTextColor),
+                              if (p.email.isNotEmpty) ...[
+                                const SizedBox(height: 3),
+                                Text(
+                                  p.email.toLowerCase(),
+                                  style: GoogleFonts.jetBrainsMono(
+                                    fontSize: 10,
+                                    color: HardwarePalette.silkscreenMuted,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: HardwarePalette.debossedSlot,
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        p.companyCode.isNotEmpty ? p.companyCode : "FLEET-01",
+                                        style: GoogleFonts.jetBrainsMono(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                          color: HardwarePalette.silkscreenDark,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Flexible(
+                                    child: Text(
+                                      p.vehiclePlateNumber.isNotEmpty ? p.vehiclePlateNumber.toUpperCase() : "KA 19 MD 4022",
+                                      style: GoogleFonts.jetBrainsMono(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w900,
+                                        color: HardwarePalette.signalEmerald,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
                         ),
                       ],
                     ),
-                    
-                    const SizedBox(height: 18),
-                    const Divider(color: Colors.white10),
+                    const SizedBox(height: 14),
+                    Divider(height: 1, color: HardwarePalette.matrixBorderLight),
                     const SizedBox(height: 10),
 
-                    // Gamified XP Leveling progress
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          "LEVEL ${profile.level}",
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w900,
-                            color: isLight ? Colors.black : AppColors.primary,
-                            letterSpacing: 1.0,
-                          ),
-                        ),
-                        Text(
-                          "${profile.xp % 1000} / 1000 XP",
-                          style: TextStyle(fontSize: 11, color: secondaryTextColor, fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: (profile.xp % 1000) / 1000.0,
-                        minHeight: 6,
-                        backgroundColor: isLight ? const Color(0xFFE5E5E5) : AppColors.border,
-                        valueColor: AlwaysStoppedAnimation<Color>(isLight ? Colors.black : AppColors.primary),
-                      ),
-                    ),
-                    
-                    // Streak counter badge
-                    if (profile.streak > 0) ...[
-                      const SizedBox(height: 14),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    // Quick Edit Profile Action Button
+                    GestureDetector(
+                      onTap: () {
+                        HapticService.selectionClick();
+                        Navigator.pushNamed(context, AppRoutes.editProfile);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                         decoration: BoxDecoration(
-                          color: AppColors.warning.withOpacity(0.08),
-                          border: Border.all(color: AppColors.warning.withOpacity(0.2), width: 1),
+                          color: HardwarePalette.debossedSlot,
                           borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: HardwarePalette.matrixBorderLight),
                         ),
                         child: Row(
-                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.local_fire_department, color: AppColors.warning, size: 16),
+                            const Icon(Icons.edit_outlined, size: 14, color: HardwarePalette.signalEmerald),
                             const SizedBox(width: 6),
                             Text(
-                              "${profile.streak} DAY SAFE DRIVING STREAK",
-                              style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: AppColors.warning),
+                              "EDIT PROFILE & VEHICLE SPECS",
+                              style: GoogleFonts.spaceGrotesk(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w800,
+                                color: HardwarePalette.silkscreenDark,
+                                letterSpacing: 0.5,
+                              ),
                             ),
                           ],
                         ),
                       ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // 2. Achievements Grid
-              const Text(
-                "UNLOCKED ACHIEVEMENTS",
-                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.textSecondary, letterSpacing: 1.5),
-              ),
-              const SizedBox(height: 10),
-              GlassCard(
-                child: GridView.count(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  crossAxisCount: 2,
-                  childAspectRatio: 2.2,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  children: [
-                    _buildBadgeCard(
-                      "🚀 SMOOTH",
-                      "0 Harsh G-Events",
-                      profile.badges.contains("smooth_operator"),
-                      AppColors.success,
-                    ),
-                    _buildBadgeCard(
-                      "🛡️ SPEED",
-                      "Adheres limits",
-                      profile.badges.contains("speed_sentinel"),
-                      AppColors.primary,
-                    ),
-                    _buildBadgeCard(
-                      "📱 FOCUSED",
-                      "No device usage",
-                      profile.badges.contains("focus_champion"),
-                      Colors.pink,
-                    ),
-                    _buildBadgeCard(
-                      "🌙 NIGHT",
-                      "Safe night runs",
-                      profile.badges.contains("night_rider"),
-                      Colors.purple,
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 14),
 
-              // 2. Maintenance Milestones Reminder
-              const Text(
-                "UPCOMING MAINTENANCE CHECKS",
-                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.textSecondary, letterSpacing: 1.5),
-              ),
-              const SizedBox(height: 10),
-              GlassCard(
+              // ── 1.5 FAMILY INFORMATION & WHATSAPP SHIELD CARD ───────────
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: HardwarePalette.milledSurface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: HardwarePalette.matrixBorderLight, width: 1.2),
+                ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildServiceItem("Brakes Pad Inspection", "380 mi remaining", 0.82, AppColors.warning),
-                    const Divider(),
-                    _buildServiceItem("Engine/Motor Coolant Check", "840 mi remaining", 0.44, AppColors.primary),
-                    const Divider(),
-                    _buildServiceItem("Tire Rotation & Pressure Check", "1,720 mi remaining", 0.18, AppColors.success),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // 4. Utility Paths (Settings, Logout)
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        Navigator.pushNamed(context, AppRoutes.settings);
-                      },
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: primaryTextColor,
-                        side: BorderSide(color: isLight ? const Color(0xFFCCCCCC) : AppColors.border, width: 1.5),
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.settings_outlined, size: 18),
-                          SizedBox(width: 8),
-                          Text("CONFIG"),
-                        ],
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF25D366).withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.family_restroom_rounded, color: Color(0xFF25D366), size: 16),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              "FAMILY WHATSAPP SHIELD",
+                              style: GoogleFonts.spaceGrotesk(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                                color: HardwarePalette.silkscreenDark,
+                                letterSpacing: 0.6,
+                              ),
+                            ),
+                          ],
+                        ),
+                        GestureDetector(
+                          onTap: () {
+                            HapticService.selectionClick();
+                            Navigator.pushNamed(context, AppRoutes.editProfile);
+                          },
+                          child: Text(
+                            "UPDATE",
+                            style: GoogleFonts.spaceGrotesk(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: HardwarePalette.signalEmerald,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        await auth.logout();
-                        if (context.mounted) {
-                          Navigator.pushReplacementNamed(context, AppRoutes.login);
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                (p.familyMemberName.isNotEmpty ? p.familyMemberName : (p.emergencyContactName.isNotEmpty ? p.emergencyContactName : "Anjali Sharma")).toUpperCase(),
+                                style: GoogleFonts.spaceGrotesk(fontSize: 13, fontWeight: FontWeight.w800, color: HardwarePalette.silkscreenDark),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                "${p.familyRelationship.isNotEmpty ? p.familyRelationship : 'Spouse'} • ${p.familyWhatsappNumber.isNotEmpty ? p.familyWhatsappNumber : (p.emergencyContactPhone.isNotEmpty ? p.emergencyContactPhone : '+91 94812 34567')}",
+                                style: GoogleFonts.jetBrainsMono(fontSize: 10.5, color: HardwarePalette.silkscreenSubtle),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (p.familyAddress.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        p.familyAddress,
+                        style: GoogleFonts.spaceGrotesk(fontSize: 10, color: HardwarePalette.silkscreenMuted),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+
+                    // Direct WhatsApp Action Trigger
+                    GestureDetector(
+                      onTap: () async {
+                        HapticService.heavyImpact();
+                        final opened = await p.openFamilyWhatsapp();
+                        if (!opened && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                "Could not launch WhatsApp. Please check the WhatsApp number in Profile.",
+                                style: GoogleFonts.spaceGrotesk(fontSize: 11),
+                              ),
+                              backgroundColor: HardwarePalette.terracottaRed,
+                            ),
+                          );
                         }
                       },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.error.withOpacity(0.08),
-                        foregroundColor: AppColors.error,
-                        side: const BorderSide(color: AppColors.error, width: 1),
-                        shadowColor: Colors.transparent,
-                        elevation: 0,
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.exit_to_app_outlined, size: 18),
-                          SizedBox(width: 8),
-                          Text("LOGOUT"),
-                        ],
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF25D366),
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF25D366).withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.chat_rounded, color: Colors.white, size: 16),
+                            const SizedBox(width: 8),
+                            Text(
+                              "MESSAGE FAMILY ON WHATSAPP",
+                              style: GoogleFonts.spaceGrotesk(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // ── 2. MECHANICAL CONTROLS LEVERS ─────────────────────────
+              Text(
+                "HARDWARE & TELEMETRY LEVERS",
+                style: GoogleFonts.jetBrainsMono(fontSize: 10.5, fontWeight: FontWeight.w800, color: HardwarePalette.silkscreenSubtle),
+              ),
+              const SizedBox(height: 10),
+
+              MechanicalLeverSwitch(
+                value: _bgUsage,
+                label: "BACKGROUND SENSOR STREAMING",
+                activeLabel: "ALWAYS ON (WAKE LOCK)",
+                inactiveLabel: "FOREGROUND ONLY",
+                onChanged: (v) async {
+                  setState(() => _bgUsage = v);
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setBool('sd_driver_bg_mode', v);
+                  auth.setAppUsageMode(v);
+                },
+              ),
+              const SizedBox(height: 10),
+
+              MechanicalLeverSwitch(
+                value: _emergencyOnlyVoice,
+                label: "VOICE ALERTS MODE",
+                activeLabel: "EMERGENCY ONLY (SILENT DRIVE)",
+                inactiveLabel: "ALL AUDIO ANNOUNCEMENTS",
+                onChanged: (v) async {
+                  setState(() => _emergencyOnlyVoice = v);
+                  await VoiceService.setEmergencyOnlyMode(v);
+                },
+              ),
+              const SizedBox(height: 10),
+
+              MechanicalLeverSwitch(
+                value: _biometricAuth,
+                label: "BIOMETRIC AUTH SECURITY",
+                activeLabel: "FINGERPRINT ARMED",
+                inactiveLabel: "PIN ONLY",
+                onChanged: (v) => setState(() => _biometricAuth = v),
+              ),
+              const SizedBox(height: 10),
+
+              MechanicalLeverSwitch(
+                value: _isOnLeave,
+                label: "DUTY AVAILABILITY RELAY",
+                activeLabel: "ON LEAVE // OFFLINE",
+                inactiveLabel: "ACTIVE ON FLEET DUTY",
+                activeColor: HardwarePalette.cautionAmber,
+                onChanged: (v) async {
+                  setState(() => _isOnLeave = v);
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setBool('sd_driver_on_leave', v);
+                },
+              ),
+              const SizedBox(height: 20),
+
+              // ── 3. SIGN OUT TACTILE BUTTON ───────────────────────────
+              GestureDetector(
+                onTap: () async {
+                  HapticService.heavyImpact();
+                  SoundEffectService.playRelayLatch();
+                  await auth.logout();
+                  if (context.mounted) {
+                    Navigator.pushNamedAndRemoveUntil(context, AppRoutes.login, (route) => false);
+                  }
+                },
+                child: Container(
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: HardwarePalette.isDark ? const Color(0xFF2A1515) : const Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: HardwarePalette.isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFCA5A5),
+                      width: 1.2,
+                    ),
                   ),
-                ],
+                  child: Center(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.logout_rounded, color: Color(0xFFDC2626), size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          "LOGOUT",
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.0,
+                            color: const Color(0xFFDC2626),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
@@ -416,100 +481,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-
-
-
-
-  Widget _buildServiceItem(String title, String status, double progressValue, Color progressColor) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
-    final primaryTextColor = isLight ? Colors.black : Colors.white;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                title,
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: primaryTextColor),
-              ),
-              Text(
-                status,
-                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: progressColor),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: progressValue,
-              minHeight: 4,
-              backgroundColor: isLight ? const Color(0xFFE5E5E5) : AppColors.border,
-              valueColor: AlwaysStoppedAnimation<Color>(progressColor),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBadgeCard(String label, String desc, bool isUnlocked, Color themeColor) {
-    final isLight = Theme.of(context).brightness == Brightness.light;
-    final primaryTextColor = isLight ? Colors.black : Colors.white;
-    final secondaryTextColor = isLight ? const Color(0xFF666666) : const Color(0xFF90A4AE);
-
+  Widget _buildScrewRivet() {
     return Container(
-      padding: const EdgeInsets.all(12),
+      width: 10,
+      height: 10,
       decoration: BoxDecoration(
-        color: isUnlocked 
-            ? themeColor.withOpacity(0.08) 
-            : (isLight ? const Color(0xFFF2F3F5) : const Color(0xFF1E2026)),
-        border: Border.all(
-          color: isUnlocked 
-              ? themeColor.withOpacity(0.4) 
-              : (isLight ? const Color(0xFFDDDDDD) : Colors.white.withOpacity(0.05)),
-          width: 1.5,
-        ),
-        borderRadius: BorderRadius.circular(16),
+        color: const Color(0xFFE2E8F0),
+        shape: BoxShape.circle,
+        border: Border.all(color: const Color(0xFFCBD5E1), width: 1.0),
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                    color: isUnlocked ? themeColor : secondaryTextColor,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  desc,
-                  style: TextStyle(
-                    fontSize: 9, 
-                    color: isUnlocked ? primaryTextColor.withOpacity(0.7) : secondaryTextColor.withOpacity(0.5),
-                    fontWeight: FontWeight.bold,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          if (!isUnlocked)
-            Icon(Icons.lock, size: 14, color: secondaryTextColor.withOpacity(0.4))
-          else
-            Icon(Icons.check_circle_outline, size: 14, color: themeColor),
-        ],
+      child: Center(
+        child: Container(
+          width: 4,
+          height: 1,
+          color: const Color(0xFF94A3B8),
+        ),
       ),
     );
   }

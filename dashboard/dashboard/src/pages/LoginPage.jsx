@@ -1,11 +1,11 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { Shield, Lock, Mail, AlertTriangle } from "lucide-react";
+import { Shield, Lock, Mail, TriangleAlert as AlertTriangle } from "lucide-react";
 import apiClient from "../api/apiClient";
 
 export default function LoginPage({ onLoginSuccess }) {
   const [email, setEmail] = useState("admin@acmelogistics.com");
-  const [password, setPassword] = useState("FleetGuard2026!");
+  const [password, setPassword] = useState("SmartDrive2026!");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -34,9 +34,9 @@ export default function LoginPage({ onLoginSuccess }) {
       }
 
       // Cache admin details
-      localStorage.setItem("fg_admin_token", accessToken);
-      localStorage.setItem("fg_admin_refresh", refreshToken);
-      localStorage.setItem("fg_admin_user", JSON.stringify(user));
+      localStorage.setItem("smartdrive_admin_token", accessToken);
+      localStorage.setItem("smartdrive_admin_refresh", refreshToken);
+      localStorage.setItem("smartdrive_admin_user", JSON.stringify(user));
 
       onLoginSuccess(user);
     } catch (err) {
@@ -66,7 +66,7 @@ export default function LoginPage({ onLoginSuccess }) {
           <div className="p-4 bg-orange-500/10 rounded-2xl border border-orange-500/30 mb-4">
             <Shield className="w-10 h-10 text-orange-500 animate-pulse" />
           </div>
-          <h1 className="text-3xl font-black tracking-tight text-white">FleetGuard <span className="text-orange-500">AI</span></h1>
+          <h1 className="text-3xl font-black tracking-tight text-white">SmartDrive <span className="text-orange-500">AI</span></h1>
           <p className="text-slate-400 mt-2 text-sm text-center">
             Centralized Enterprise Command & Safety Intelligence
           </p>
@@ -128,7 +128,7 @@ export default function LoginPage({ onLoginSuccess }) {
         </form>
 
         <div className="mt-8 text-center text-xs text-slate-600">
-          FleetGuard AI Telematics &bull; v1.0.0
+          SmartDrive AI Telematics &bull; v1.0.0
         </div>
       </motion.div>
     </div>

@@ -5,13 +5,24 @@ import { logger } from '../config/logger';
 const REDIS_URL = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
 
 // Setup connection options for Redis
-// maxRetriesPerRequest is set to null per BullMQ requirements
 export const redisConnection = new IORedis(REDIS_URL, {
   maxRetriesPerRequest: null,
+  retryStrategy: (times) => {
+    // Limited retry to prevent infinite log spam if Docker is off
+    if (times > 3) {
+      return null; // Stop retrying
+    }
+    return Math.min(times * 100, 3000);
+  },
 });
 
+let lastError = '';
 redisConnection.on('error', (err) => {
-  logger.error('Redis Connection Error:', err);
+  const msg = err.message;
+  if (msg !== lastError) {
+    logger.error('Redis Connection Issue:', msg);
+    lastError = msg;
+  }
 });
 
 redisConnection.on('connect', () => {

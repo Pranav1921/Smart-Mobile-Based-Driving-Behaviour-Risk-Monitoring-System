@@ -7,7 +7,9 @@ export type VehicleType =
   | 'truck'
   | 'pickup'
 
-export type DriverStatus = 'safe' | 'warning' | 'emergency' | 'idle' | 'offline'
+export type DriverStatus = 'safe' | 'warning' | 'emergency' | 'idle' | 'offline' | 'leave' | 'on_leave' | 'delivery'
+
+export type DriverType = 'TACTICAL' | 'STANDARD'
 
 export type EventType =
   | 'overspeed'
@@ -18,6 +20,40 @@ export type EventType =
   | 'phone_usage'
   | 'low_battery'
   | 'gps_lost'
+  | 'rule_violation'
+  | 'one_way_breach'
+  | 'school_zone_speed'
+  | 'pothole_hazard'
+
+export interface LivePothole {
+  id: string
+  latitude: number
+  longitude: number
+  intensity: number
+  vibrationRate?: number
+  driverId?: string
+  driverName?: string
+  roadName?: string
+  regionId?: string
+  timestamp: string
+}
+
+export interface RuleViolation {
+  id: string
+  driverId: string
+  driverName: string
+  ruleType: string
+  ruleTitle: string
+  severity: Severity
+  latitude: number
+  longitude: number
+  speed: number
+  speedLimit: number
+  roadType: string
+  roadName: string
+  description: string
+  timestamp: string
+}
 
 export type Severity = 'low' | 'medium' | 'high' | 'critical'
 
@@ -33,14 +69,32 @@ export interface Vehicle {
   registration: string
   health: number
   insuranceValid: string
+  batteryOrFuel?: number
+  plateNumber?: string
+  model?: string
+  driverName?: string
 }
 
 export interface Driver {
   id: string
+  userId?: string
   name: string
+  email?: string
+  phone?: string
+  licenseNumber?: string
+  emergencyContactName?: string
+  emergencyContactPhone?: string
+  emergencyRelationship?: string
+  appliedVehicle?: string
+  zone?: string
+  badges?: string[]
+  user?: any
   employeeId: string
   photo: string
+  avatar?: string
   status: DriverStatus
+  driverType?: DriverType
+  leaveReason?: string
   vehicleId: string
   industry: string
   fleet: string
@@ -70,11 +124,31 @@ export interface Driver {
   aggressive: number
   recommendation: string
   heading: number
+  vehicleName?: string
+  vehiclePlate?: string
+  activeOrder?: any
+  maxSpeedToday?: number
   orderItems?: string
   deliveryFrom?: string
   deliveryTo?: string
   startLocation?: LatLng
   endLocation?: LatLng
+  accelX?: number
+  accelY?: number
+  accelZ?: number
+  vibrationRate?: number
+  gyroX?: number
+  gyroY?: number
+  gyroZ?: number
+  magX?: number
+  magY?: number
+  magZ?: number
+  destLat?: number
+  destLng?: number
+  regionId?: string
+  region?: string
+  points?: number
+  earnings?: number
 }
 
 export interface FleetEvent {

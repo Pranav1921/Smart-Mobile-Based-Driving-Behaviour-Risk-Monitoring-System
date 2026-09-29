@@ -77,7 +77,7 @@ export class ReportService {
         doc
           .fillColor('#1A1C1E')
           .fontSize(24)
-          .text('FleetGuard AI - Operational Summary', { align: 'center' });
+          .text('Smart Driving AI - Operational Summary', { align: 'center' });
         doc.moveDown(0.2);
         doc
           .fillColor('#5B5E62')

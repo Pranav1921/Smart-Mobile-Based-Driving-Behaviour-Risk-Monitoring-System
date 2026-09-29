@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartDrive | Mission Dispatch Control</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #05080f; color: white; }
+        .glass { background: rgba(13, 17, 28, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.08); }
+        .accent-gradient { background: linear-gradient(135deg, #10b981, #059669); }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+
+        function App() {
+            const [form, setForm] = useState({
+                customerName: '',
+                items: '',
+                amount: '250',
+                pickupAddress: 'Puttur City Center Hub',
+                pickupLat: '12.7749',
+                pickupLng: '75.2023',
+                deliveryAddress: 'Kadaba Road, Near Station',
+                deliveryLat: '12.7950',
+                deliveryLng: '75.2250'
+            });
+            const [loading, setLoading] = useState(false);
+            const [status, setStatus] = useState(null);
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setLoading(true);
+                setStatus(null);
+
+                const payload = {
+                    customerName: form.customerName,
+                    items: form.items.split(',').map(i => i.trim()),
+                    amount: parseFloat(form.amount),
+                    deliveryLocation: {
+                        address: form.deliveryAddress,
+                        latitude: parseFloat(form.deliveryLat),
+                        longitude: parseFloat(form.deliveryLng)
+                    },
+                    // We'll also send pickup details for the driver's UI
+                    deliveryFrom: form.pickupAddress
+                };
+
+                try {
+                    const res = await fetch('http://localhost:3000/api/v1/orders', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (res.ok) {
+                        setStatus({ type: 'success', text: 'MISSION DISPATCHED SUCCESSFULLY! Redirecting to grid...' });
+                        setForm({ ...form, customerName: '', items: '' });
+                    } else {
+                        setStatus({ type: 'error', text: 'Dispatch failed. Check backend connection.' });
+                    }
+                } catch (err) {
+                    setStatus({ type: 'error', text: 'Error: Backend unreachable (ECONNREFUSED)' });
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col items-center p-6 md:p-12">
+                    <div className="w-full max-w-4xl">
+                        <header className="mb-10 text-center">
+                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase tracking-widest mb-4">
+                                Strategic Fleet Operations
+                            </div>
+                            <h1 className="text-3xl font-extrabold tracking-tight">Mission Dispatch Control</h1>
+                            <p className="text-slate-500 text-sm mt-2">Generate and broadcast delivery missions to the active fleet grid with precise coordinates.</p>
+                        </header>
+
+                        {status && (
+                            <div className={`mb-6 p-4 rounded-2xl text-xs font-bold ${status.type === 'success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
+                                {status.text}
+                            </div>
+                        )}
+
+                        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="glass rounded-[32px] p-8 space-y-6">
+                                <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Mission Intel</h3>
+
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Customer / Entity Name</label>
+                                    <input required type="text" value={form.customerName} onChange={e => setForm({...form, customerName: e.target.value})} placeholder="e.g. Amazon Station C2" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-emerald-500 outline-none transition-all" />
+                                </div>
+
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Package Items (comma separated)</label>
+                                    <input required type="text" value={form.items} onChange={e => setForm({...form, items: e.target.value})} placeholder="Electronics, Medical Supplies" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-emerald-500 outline-none transition-all" />
+                                </div>
+
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Payout Amount (INR)</label>
+                                    <input required type="number" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-emerald-500 outline-none transition-all" />
+                                </div>
+                            </div>
+
+                            <div className="glass rounded-[32px] p-8 space-y-6">
+                                <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Geographic Vectors</h3>
+
+                                <div className="space-y-4">
+                                    <div className="p-4 bg-emerald-500/5 rounded-2xl border border-emerald-500/10">
+                                        <label className="block text-[9px] font-black text-emerald-500 uppercase mb-2">Origin (Pickup)</label>
+                                        <input required type="text" value={form.pickupAddress} onChange={e => setForm({...form, pickupAddress: e.target.value})} placeholder="Address" className="w-full bg-transparent border-b border-white/10 py-1 text-xs mb-3 outline-none focus:border-emerald-500" />
+                                        <div className="flex gap-3">
+                                            <input required type="text" value={form.pickupLat} onChange={e => setForm({...form, pickupLat: e.target.value})} placeholder="Lat" className="flex-1 bg-white/5 rounded-lg px-3 py-2 text-[10px] font-mono outline-none" />
+                                            <input required type="text" value={form.pickupLng} onChange={e => setForm({...form, pickupLng: e.target.value})} placeholder="Lng" className="flex-1 bg-white/5 rounded-lg px-3 py-2 text-[10px] font-mono outline-none" />
+                                        </div>
+                                    </div>
+
+                                    <div className="p-4 bg-blue-500/5 rounded-2xl border border-blue-500/10">
+                                        <label className="block text-[9px] font-black text-blue-500 uppercase mb-2">Destination (Drop)</label>
+                                        <input required type="text" value={form.deliveryAddress} onChange={e => setForm({...form, deliveryAddress: e.target.value})} placeholder="Address" className="w-full bg-transparent border-b border-white/10 py-1 text-xs mb-3 outline-none focus:border-blue-500" />
+                                        <div className="flex gap-3">
+                                            <input required type="text" value={form.deliveryLat} onChange={e => setForm({...form, deliveryLat: e.target.value})} placeholder="Lat" className="flex-1 bg-white/5 rounded-lg px-3 py-2 text-[10px] font-mono outline-none" />
+                                            <input required type="text" value={form.deliveryLng} onChange={e => setForm({...form, deliveryLng: e.target.value})} placeholder="Lng" className="flex-1 bg-white/5 rounded-lg px-3 py-2 text-[10px] font-mono outline-none" />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button disabled={loading} type="submit" className="w-full accent-gradient h-14 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-500/20 active:scale-95 transition-all">
+                                    {loading ? 'Transmitting Data...' : 'INITIALIZE MISSION DISPATCH'}
+                                </button>
+                            </div>
+                        </form>
+
+                        <footer className="mt-12 text-center text-[10px] text-slate-600 font-bold uppercase tracking-widest">
+                            &copy; 2026 Smart Driving Risk Systems | Regional Command Hub
+                        </footer>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

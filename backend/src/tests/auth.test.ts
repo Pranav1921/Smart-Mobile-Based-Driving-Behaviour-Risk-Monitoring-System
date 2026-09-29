@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import request from 'supertest';
 
 // Mock Redis (ioredis) to prevent connection errors during test imports
@@ -44,24 +45,24 @@ describe('Authentication Route Integration Tests', () => {
       const mockSession = {
         user: {
           id: 'user-uuid-101',
-          email: 'test@fleetguard.ai',
+          email: 'test@smartdrive.ai',
           role: 'DRIVER',
         },
         accessToken: 'mock-access-token-jwt-key',
         refreshToken: 'mock-refresh-token-jwt-key',
       };
-      (authService.login as jest.Mock).mockResolvedValue(mockSession);
+      (authService.login as any).mockResolvedValue(mockSession);
 
       const res = await request(app)
         .post('/api/v1/auth/login')
-        .send({ email: 'test@fleetguard.ai', password: 'FleetGuard2026!' });
+        .send({ email: 'test@smartdrive.ai', password: 'SmartDrive2026!' });
 
       expect(res.statusCode).toBe(200);
       expect(res.body.status).toBe('success');
       expect(res.body.data.accessToken).toBe('mock-access-token-jwt-key');
       expect(authService.login).toHaveBeenCalledWith({
-        email: 'test@fleetguard.ai',
-        password: 'FleetGuard2026!',
+        email: 'test@smartdrive.ai',
+        password: 'SmartDrive2026!',
       });
     });
 

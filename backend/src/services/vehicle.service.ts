@@ -67,15 +67,15 @@ export class VehicleService {
   }
 
   async getVehiclesList(
-    organizationId: string,
+    organizationId?: string,
     query: {
       skip?: number;
       take?: number;
       vehicleType?: VehicleType;
       maintenanceStatus?: MaintenanceStatus;
-    }
+    } = {}
   ): Promise<{ vehicles: Vehicle[]; count: number }> {
-    const where: Prisma.VehicleWhereInput = { organizationId };
+    const where: Prisma.VehicleWhereInput = organizationId ? { organizationId } : {};
 
     if (query.vehicleType) {
       where.vehicleType = query.vehicleType;

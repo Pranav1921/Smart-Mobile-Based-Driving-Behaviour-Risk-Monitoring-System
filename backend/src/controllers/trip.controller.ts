@@ -17,8 +17,13 @@ export class TripController {
         throw new BadRequestError('User does not have an active driver profile');
       }
 
-      const { vehicleId } = req.body;
-      const trip = await tripService.startTrip(driver.id, vehicleId, orgId);
+      const { vehicleId, deliveryFrom, deliveryTo, orderItems, orderId } = req.body;
+      const trip = await tripService.startTrip(driver.id, vehicleId, orgId, {
+        deliveryFrom,
+        deliveryTo,
+        orderItems,
+        orderId,
+      });
 
       res.status(201).json({
         status: 'success',
@@ -60,10 +65,7 @@ export class TripController {
 
   async getList(req: Request, res: Response, next: NextFunction) {
     try {
-      const orgId = req.user?.organizationId;
-      if (!orgId) {
-        throw new ForbiddenError('Missing organization parameter context');
-      }
+      const orgId = req.user?.organizationId || (req.query.organizationId as string);
 
       const result = await tripService.getTripsList(orgId, req.query);
       res.status(200).json({

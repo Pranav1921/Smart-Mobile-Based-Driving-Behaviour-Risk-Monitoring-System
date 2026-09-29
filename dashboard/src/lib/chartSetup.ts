@@ -1,29 +1,9 @@
 import {
   Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  ArcElement,
-  RadialLinearScale,
-  Filler,
-  Tooltip,
-  Legend,
+  registerables,
 } from 'chart.js'
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  ArcElement,
-  RadialLinearScale,
-  Filler,
-  Tooltip,
-  Legend,
-)
+ChartJS.register(...registerables)
 
 ChartJS.defaults.color = '#9aa7c2'
 ChartJS.defaults.font.family = "'Inter', sans-serif"

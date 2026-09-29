@@ -11,13 +11,13 @@ const trips = drivers.flatMap((d, di) =>
   Array.from({ length: 2 }, (_, i) => ({
     id: `${d.id}-t${i}`,
     driver: d.name,
-    from: d.fleet.split('·')[1]?.trim() ?? 'Hub',
-    to: d.locationName,
-    distance: +(d.distanceToday / 2 + seeded(di + i) * 8).toFixed(1),
-    duration: Math.round(d.tripDurationMin / 2 + seeded(di * 2 + i) * 20),
-    maxSpeed: Math.round(60 + seeded(di + i * 3) * 40),
-    events: Math.round(seeded(di * 3 + i) * 6),
-    score: Math.max(55, Math.min(98, d.safetyScore + Math.round(seeded(di + i) * 10 - 5))),
+    from: i === 0 ? 'Puttur Logistics Hub' : 'Uppinangady Station',
+    to: d.vehicleName?.split('(')[0]?.trim() || 'Regional Delivery',
+    distance: +(d.distanceToday / (i + 1.2)).toFixed(1),
+    duration: Math.round(25 + (di * 5) + i * 12),
+    maxSpeed: Math.round(d.maxSpeedToday || 55),
+    events: i === 0 ? 0 : 1,
+    score: Math.min(100, Math.round(d.safetyScore)),
   })),
 )
 
@@ -50,7 +50,7 @@ export default function Trips() {
               <div className="grid grid-cols-4 gap-4 lg:w-96 shrink-0 text-[12px]">
                 <Stat icon={Gauge} label="Distance" value={`${t.distance} km`} />
                 <Stat icon={Clock} label="Duration" value={`${t.duration}m`} />
-                <Stat icon={Gauge} label="Max" value={`${t.maxSpeed}`} />
+                <Stat icon={Gauge} label="Max Speed" value={`${t.maxSpeed} km/h`} />
                 <Stat icon={TriangleAlert} label="Events" value={`${t.events}`} />
               </div>
               <div className="lg:w-20 shrink-0 text-right">

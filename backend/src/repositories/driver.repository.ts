@@ -114,5 +114,13 @@ export class DriverRepository {
       },
     });
   }
+
+  async delete(id: string) {
+    // Unassign active vehicle assignments
+    await prisma.vehicleAssignment.deleteMany({ where: { driverId: id } });
+    // Remove scores and assignments
+    await prisma.driverScore.deleteMany({ where: { driverId: id } });
+    return prisma.driver.delete({ where: { id } });
+  }
 }
 export const driverRepository = new DriverRepository();

@@ -1,7 +1,7 @@
 {
-  "name": "fleetguard-ai-backend",
+  "name": "smartdrive-backend",
   "version": "1.0.0",
-  "description": "Production-ready backend for FleetGuard AI Driver Behavior & Fleet Monitoring",
+  "description": "Production-ready backend for Smart Mobile-Based Driving Behaviour & Risk Monitoring System",
   "main": "dist/server.js",
   "scripts": {
     "build": "tsc",
@@ -10,7 +10,8 @@
     "db:migrate": "npx prisma migrate dev --schema=src/prisma/schema.prisma",
     "db:deploy": "npx prisma migrate deploy --schema=src/prisma/schema.prisma",
     "db:generate": "npx prisma generate --schema=src/prisma/schema.prisma",
-    "db:seed": "ts-node src/database/seed.ts",
+    "db:seed": "ts-node src/prisma/seed.ts",
+    "db:purge": "ts-node src/database/seed.ts",
     "db:studio": "npx prisma studio --schema=src/prisma/schema.prisma",
     "test": "jest --runInBand --detectOpenHandles"
   },
@@ -31,6 +32,7 @@
     "multer": "^1.4.5-lts.1",
     "pdfkit": "^0.15.0",
     "socket.io": "^4.7.5",
+    "socket.io-client": "^4.8.4",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.0",
     "uuid": "^9.0.1",
@@ -60,6 +62,6 @@
     "typescript": "^5.4.5"
   },
   "prisma": {
-    "seed": "ts-node src/database/seed.ts"
+    "seed": "ts-node src/prisma/seed.ts"
   }
 }

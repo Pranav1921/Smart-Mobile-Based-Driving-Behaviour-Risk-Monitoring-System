@@ -31,7 +31,7 @@ class GForceMeter extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: AppColors.background.withOpacity(0.4),
+        color: AppColors.background.withAlpha((0.4 * 255).round()),
         shape: BoxShape.circle,
         border: Border.all(color: AppColors.border, width: 1.0),
       ),
@@ -51,7 +51,7 @@ class GForceMeter extends StatelessWidget {
             bottom: 6,
             child: Text(
               "${totalForce.toStringAsFixed(2)} G",
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 0.5,
@@ -84,7 +84,7 @@ class _GForceRadarPainter extends CustomPainter {
     final radius = size.width / 2;
 
     final gridPaint = Paint()
-      ..color = AppColors.border.withOpacity(0.12)
+      ..color = AppColors.border.withAlpha((0.12 * 255).round())
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0;
 
@@ -95,11 +95,6 @@ class _GForceRadarPainter extends CustomPainter {
     // Draw cross hairs
     canvas.drawLine(Offset(0, center.dy), Offset(size.width, center.dy), gridPaint);
     canvas.drawLine(Offset(center.dx, 0), Offset(center.dx, size.height), gridPaint);
-
-    // Labels
-    final textPainter = TextPainter(
-      textDirection: TextDirection.ltr,
-    );
 
     // Map X, Y G-force coordinates to screen pixels
     // Note: Gy is negative for braking, positive for acceleration
@@ -123,14 +118,14 @@ class _GForceRadarPainter extends CustomPainter {
 
     // Draw glowing trace trail towards center
     final trailPaint = Paint()
-      ..color = pointColor.withOpacity(0.15)
+      ..color = pointColor.withAlpha((0.15 * 255).round())
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3.0;
     canvas.drawLine(center, targetOffset, trailPaint);
 
     // Draw G-Force Dot Shadow
     final dotShadow = Paint()
-      ..color = pointColor.withOpacity(0.4)
+      ..color = pointColor.withAlpha((0.4 * 255).round())
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8)
       ..style = PaintingStyle.fill;
     canvas.drawCircle(targetOffset, 8, dotShadow);
@@ -143,7 +138,7 @@ class _GForceRadarPainter extends CustomPainter {
 
     // Draw center point indicator
     final centerPaint = Paint()
-      ..color = AppColors.textSecondary.withOpacity(0.5)
+      ..color = AppColors.textSecondary.withAlpha((0.5 * 255).round())
       ..style = PaintingStyle.fill;
     canvas.drawCircle(center, 2, centerPaint);
   }

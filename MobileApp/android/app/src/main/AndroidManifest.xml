@@ -8,16 +8,33 @@
     <!-- Sensor / Motion permissions -->
     <uses-permission android:name="android.permission.BODY_SENSORS"/>
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION"/>
+    <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS"/>
 
-    <!-- Camera permission (dashcam) -->
+    <!-- Multimedia (Dashcam & SOS Audio) -->
     <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
 
     <!-- Network -->
     <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!-- Bluetooth Low Energy (ESP32 Sensor) -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <application
-        android:label="fleet_guard"
+        android:label="Smart Driving Behaviour &amp; Risk Monitoring System"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+
+        <!--
+          IMPORTANT: Replace 'YOUR_API_KEY_HERE' with your actual Google Maps API Key.
+          You can get one from the Google Cloud Console: https://console.cloud.google.com/
+        -->
+        <meta-data android:name="com.google.android.geo.API_KEY"
+            android:value="YOUR_API_KEY_HERE"/>
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -56,5 +73,23 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- Allows opening Google Maps and navigation intents -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="geo" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="google.navigation" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+            <data android:scheme="tel" />
+        </intent>
+        <package android:name="com.google.android.apps.maps" />
     </queries>
 </manifest>

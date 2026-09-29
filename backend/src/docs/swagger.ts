@@ -4,10 +4,10 @@ const options: swaggerJSDoc.Options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'FleetGuard AI API Specifications',
+      title: 'SmartDrive AI API Specifications',
       version: '1.0.0',
       description:
-        'RESTful API endpoints for the FleetGuard AI Smart Driving Safety Telemetry and Fleet Management dashboard backend.',
+        'RESTful API endpoints for the Smart Driving Behaviour & Risk Monitoring System backend.',
     },
     servers: [
       {

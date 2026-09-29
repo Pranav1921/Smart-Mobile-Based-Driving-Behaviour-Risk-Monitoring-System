@@ -55,75 +55,57 @@ class _SafetyScoreRingState extends State<SafetyScoreRing> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
-    Color getScoreColor(double score) {
-      if (score >= 90) return AppColors.success;
-      if (score >= 70) return AppColors.warning;
-      return AppColors.error;
-    }
-
     return AnimatedBuilder(
       animation: _animation,
       builder: (context, child) {
         final currentVal = _animation.value;
-        final color = getScoreColor(currentVal);
 
         return Stack(
           alignment: Alignment.center,
           children: [
-            // Glowing Backdrop Glow
+            // Soft Radial Background Glow
             Container(
-              width: widget.size * 0.8,
-              height: widget.size * 0.8,
+              width: widget.size * 0.75,
+              height: widget.size * 0.75,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: color.withOpacity(0.08),
-                    blurRadius: 40,
-                    spreadRadius: 10,
-                  ),
-                ],
+                gradient: RadialGradient(
+                  colors: [
+                    const Color(0xFF284A3B).withOpacity(0.08),
+                    Colors.transparent,
+                  ],
+                ),
               ),
             ),
             CustomPaint(
               size: Size(widget.size, widget.size),
               painter: _ScoreRingPainter(
                 score: currentVal,
-                strokeWidth: widget.strokeWidth,
-                activeColor: color,
               ),
             ),
             Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  currentVal.toStringAsFixed(0),
+                  currentVal.toStringAsFixed(1),
                   style: TextStyle(
-                    fontSize: widget.size * 0.26,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: -1.0,
-                    color: AppColors.textPrimary,
+                    fontSize: widget.size * 0.25,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -1.5,
+                    color: const Color(0xFF1C3B2B),
                   ),
                 ),
+                const SizedBox(height: 2),
                 Text(
-                  "SAFETY RATING",
+                  "Safety Score",
                   style: TextStyle(
-                    fontSize: widget.size * 0.065,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.5,
-                    color: AppColors.textSecondary,
+                    fontSize: widget.size * 0.07,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.2,
+                    color: const Color(0xFF233229),
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  currentVal >= 90 ? "EXCELLENT" : (currentVal >= 70 ? "STABLE" : "RISKY"),
-                  style: TextStyle(
-                    fontSize: widget.size * 0.06,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.0,
-                    color: color,
-                  ),
-                ),
+
               ],
             ),
           ],
@@ -135,57 +117,83 @@ class _SafetyScoreRingState extends State<SafetyScoreRing> with SingleTickerProv
 
 class _ScoreRingPainter extends CustomPainter {
   final double score;
-  final double strokeWidth;
-  final Color activeColor;
 
   _ScoreRingPainter({
     required this.score,
-    required this.strokeWidth,
-    required this.activeColor,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = (size.width - strokeWidth) / 2;
+    final startAngle = 135 * (pi / 180); // Bottom left (135 deg)
+    final sweepAngle = 270 * (pi / 180); // 270 deg total arc
 
-    // 1. Draw track circle
-    final trackPaint = Paint()
-      ..color = AppColors.border.withOpacity(0.1)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth;
-    canvas.drawCircle(center, radius, trackPaint);
-
-    // 2. Draw progress arc (Starts from top -90 degrees or -pi/2)
-    final progressPaint = Paint()
-      ..shader = SweepGradient(
-        colors: [
-          activeColor.withOpacity(0.4),
-          activeColor,
-          activeColor,
-        ],
-        stops: const [0.0, 0.7, 1.0],
-        transform: const GradientRotation(-pi / 2),
-      ).createShader(Rect.fromCircle(center: center, radius: radius))
+    // 1. Outer Neumorphic Beige Track Arc
+    final outerRadius = (size.width - 24) / 2;
+    final outerTrackPaint = Paint()
+      ..color = const Color(0xFFE4DACB)
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
-      ..strokeWidth = strokeWidth;
-
-    double sweepAngle = (score / 100.0) * 2 * pi;
-    // Limit small sweep angles to avoid rendering full circle when 0
-    sweepAngle = sweepAngle.clamp(0.001, 2 * pi - 0.001);
+      ..strokeWidth = 16.0;
 
     canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      -pi / 2,
+      Rect.fromCircle(center: center, radius: outerRadius),
+      startAngle,
       sweepAngle,
       false,
-      progressPaint,
+      outerTrackPaint,
+    );
+
+    // 2. Outer Track Border Highlights (Bevel effect)
+    final outerHighlightPaint = Paint()
+      ..color = Colors.white.withOpacity(0.6)
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 2.0;
+
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: outerRadius + 8),
+      startAngle,
+      sweepAngle,
+      false,
+      outerHighlightPaint,
+    );
+
+    // 3. Knob/Thumb indicator on Outer Track
+    final knobProgressAngle = startAngle + (sweepAngle * 0.72); // ~45 deg position
+    final knobX = center.dx + outerRadius * cos(knobProgressAngle);
+    final knobY = center.dy + outerRadius * sin(knobProgressAngle);
+
+    final knobOuterPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset(knobX, knobY), 8.0, knobOuterPaint);
+
+    final knobInnerPaint = Paint()
+      ..color = const Color(0xFFE4DACB)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset(knobX, knobY), 5.0, knobInnerPaint);
+
+    // 4. Inner Dark Forest Green Score Arc
+    final innerRadius = outerRadius - 16;
+    final innerArcPaint = Paint()
+      ..color = const Color(0xFF284A3B)
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 7.0;
+
+    double activeSweepAngle = sweepAngle * (score / 100.0).clamp(0.0, 1.0);
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: innerRadius),
+      startAngle,
+      activeSweepAngle,
+      false,
+      innerArcPaint,
     );
   }
 
   @override
   bool shouldRepaint(covariant _ScoreRingPainter oldDelegate) {
-    return oldDelegate.score != score || oldDelegate.activeColor != activeColor;
+    return oldDelegate.score != score;
   }
 }

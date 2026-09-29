@@ -1,174 +1,249 @@
 @import 'tailwindcss';
 @import 'leaflet/dist/leaflet.css';
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ============================================================
-   FleetGuard AI — White & Green Design System
-   Pure white cards, clean emerald green accents, rounded corners
+   Smart Mobile Driving Behaviour & Risk Monitoring System
+   Hardware Theme Tokens:
+   - Warm Creamy Skeuomorphic Retro-Minimalist Chassis (Light)
+   - Sleek Cybernetic Tactical Automotive Surfaces (Dark)
    ============================================================ */
 
 @theme {
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-display: 'Sora', 'Inter', system-ui, sans-serif;
+  --font-sans: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-pixel: 'Silkscreen', monospace;
 
-  /* Base surfaces */
-  --color-navy-950: #f8fafc;
-  --color-navy-900: #ffffff;
-  --color-navy-850: #ffffff;
-  --color-navy-800: #ffffff;
-  --color-navy-700: #f1f5f9;
-  --color-navy-600: #e2e8f0;
+  /* Hardware Signal Accents (Automotive Racing Red, Laser Crimson, Amber, Emerald) */
+  --color-racing-red: #E53935;
+  --color-critical-crimson: #DC2626;
+  --color-hazard-glow: #FF1744;
+  --color-caution-amber: #D97706;
+  --color-cobalt-blue: #2563EB;
+  --color-signal-emerald: #10B981;
+  --color-active-green: #00FF9D;
 
-  /* Accents - Clean Emerald Green */
-  --color-cyan: #10b981;
-  --color-cyan-soft: #059669;
-  --color-electric: #10b981;
-  --color-electric-soft: #34d399;
-
-  /* Status */
-  --color-safe: #10b981;
-  --color-warn: #f59e0b;
-  --color-danger: #ef4444;
-  --color-idle: #94a3b8;
-
-  --radius-xl: 1.25rem;
+  /* Chassis Slate Ramp */
+  --color-chassis-950: #0B0F17;
+  --color-chassis-900: #131B26;
+  --color-chassis-800: #1E293B;
+  --color-chassis-700: #263346;
 }
 
 :root {
   color-scheme: light;
-  --glass-bg: #ffffff;
-  --glass-border: rgba(0, 0, 0, 0.06);
-  --glass-highlight: rgba(255, 255, 255, 1);
-  --text-primary: #0f172a;
-  --text-secondary: #334155;
-  --text-muted: #64748b;
-  --page-bg: #f8fafc;
+  /* Light: Warm Creamy Chassis & Milled Plates */
+  --page-bg: #ECEAE6;
+  --card-bg: #FFFFFF;
+  --debossed-slot: #E2DFDC;
+  --recessed-track: #DCD8D3;
+  --metal-bezel: #D4CDC0;
+  --border-main: #DCD6CA;
+  --border-highlight: #EAE5DB;
+  --mechanical-screw: #A89F91;
+  --screw-head-dark: #786F62;
+
+  --text-primary: #3D3835;
+  --text-secondary: #6B6661;
+  --text-subtle: #8E8883;
+
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(220, 214, 202, 0.6);
+  --tactile-shadow: 0 3px 8px rgba(35, 32, 28, 0.05);
+  --inset-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.06);
 }
 
-* {
-  border-color: var(--glass-border);
-}
+.dark {
+  color-scheme: dark;
+  /* Dark: Sleek Cybernetic Automotive Chassis */
+  --page-bg: #0B0F17;
+  --card-bg: #131B26;
+  --debossed-slot: #1E293B;
+  --recessed-track: #1A2332;
+  --metal-bezel: #263346;
+  --border-main: #1F2D40;
+  --border-highlight: #283950;
+  --mechanical-screw: #475569;
+  --screw-head-dark: #64748B;
 
-html,
-body,
-#root {
-  height: 100%;
+  --text-primary: #F1F5F9;
+  --text-secondary: #94A3B8;
+  --text-subtle: #64748B;
+
+  --glass-bg: rgba(19, 27, 38, 0.85);
+  --glass-border: rgba(31, 45, 64, 0.8);
+  --tactile-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  --inset-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.4);
 }
 
 body {
   margin: 0;
   font-family: var(--font-sans);
   background: var(--page-bg);
-  background-attachment: fixed;
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+  transition: background-color 0.25s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s ease;
+  background-image: radial-gradient(rgba(100, 116, 139, 0.12) 1px, transparent 1px);
+  background-size: 24px 24px;
 }
 
-/* ---------- Utilities layered on Tailwind ---------- */
+/* ============================================================
+   MECHANICAL SKEUOMORPHIC & TACTILE UTILITY SUITE
+   ============================================================ */
+
 @layer utilities {
-  .text-primary { color: var(--text-primary); }
-  .text-secondary { color: var(--text-secondary); }
-  .text-muted { color: var(--text-muted); }
+  /* Stamped Milled Surface Card */
+  .stamped-card {
+    background-color: var(--card-bg);
+    border: 1.5px solid var(--border-main);
+    border-radius: 1.25rem;
+    box-shadow: var(--tactile-shadow);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+                border-color 0.2s ease,
+                box-shadow 0.25s ease;
+  }
+  .stamped-card:hover {
+    border-color: var(--border-highlight);
+  }
 
-  .font-display { font-family: var(--font-display); }
+  /* Recessed Debossed Inset Well / Slot */
+  .debossed-well {
+    background-color: var(--debossed-slot);
+    border: 1.2px solid var(--border-main);
+    border-radius: 0.875rem;
+    box-shadow: var(--inset-shadow);
+  }
 
+  /* Mechanical Rivet / Screw Head Corner Styling */
+  .has-rivets {
+    position: relative;
+  }
+  .has-rivets::before,
+  .has-rivets::after {
+    content: '';
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: var(--mechanical-screw);
+    box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255, 255, 255, 0.2);
+    pointer-events: none;
+    z-index: 10;
+  }
+  .has-rivets::before {
+    top: 8px;
+    left: 8px;
+  }
+  .has-rivets::after {
+    top: 8px;
+    right: 8px;
+  }
+
+  /* Tactile Mechanical Button (Zero-start snappy depress + spring recoil) */
+  .mechanical-press {
+    transition: transform 0.08s cubic-bezier(0, 0, 0.15, 1),
+                box-shadow 0.08s ease,
+                background-color 0.15s ease;
+    cursor: pointer;
+  }
+  .mechanical-press:active {
+    transform: translateY(2px) scale(0.98);
+  }
+
+  /* Typography shortcuts */
+  .font-pixel {
+    font-family: var(--font-pixel);
+    letter-spacing: 0.08em;
+  }
+  .font-space {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+  .font-tech {
+    font-family: var(--font-mono);
+    letter-spacing: 0.05em;
+  }
+
+  /* Glassmorphism fallbacks */
   .glass {
     background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-xl);
-    box-shadow: 0 4px 20px -2px rgba(16, 185, 129, 0.08);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1.5px solid var(--glass-border);
   }
 
-  .glass-hover {
-    transition: box-shadow 0.25s ease, transform 0.25s ease;
+  /* Radar sweep & live pulse */
+  .radar-sweep {
+    position: relative;
+    overflow: hidden;
   }
-  .glass-hover:hover {
-    box-shadow: 0 10px 30px -4px rgba(16, 185, 129, 0.16);
-    transform: translateY(-2px);
+  .radar-sweep::after {
+    content: '';
+    position: absolute;
+    inset: -50%;
+    background: conic-gradient(from 0deg, transparent 0deg, rgba(16, 185, 129, 0.25) 60deg, transparent 65deg);
+    animation: radar-spin 4s linear infinite;
+    pointer-events: none;
   }
-
-  .accent-gradient {
-    background: linear-gradient(135deg, #10b981, #059669);
-  }
-  .text-accent-gradient {
-    background: linear-gradient(120deg, #10b981, #047857);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-  }
-
-  .ring-glow {
-    box-shadow: 0 4px 14px 0 rgba(16, 185, 129, 0.35);
-  }
-
-  .grid-lines {
-    background-image: linear-gradient(rgba(16, 185, 129, 0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(16, 185, 129, 0.03) 1px, transparent 1px);
-    background-size: 40px 40px;
-  }
-
-  .no-scrollbar::-webkit-scrollbar { display: none; }
-  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 }
 
-/* ---------- Scrollbar ---------- */
-::-webkit-scrollbar { width: 7px; height: 7px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb {
-  background: rgba(16, 185, 129, 0.25);
-  border-radius: 999px;
+/* Animations */
+@keyframes radar-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
-::-webkit-scrollbar-thumb:hover { background: rgba(16, 185, 129, 0.5); }
 
-/* ---------- Keyframe animations ---------- */
-@keyframes float-slow {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-5px); }
-}
 @keyframes pulse-glow {
-  0%, 100% { opacity: 0.6; transform: scale(1); }
-  50% { opacity: 0.9; transform: scale(1.08); }
-}
-@keyframes shimmer {
-  0% { background-position: -800px 0; }
-  100% { background-position: 800px 0; }
-}
-
-.animate-float-slow { animation: float-slow 6s ease-in-out infinite; }
-.animate-pulse-glow { animation: pulse-glow 2.8s ease-in-out infinite; }
-
-.skeleton {
-  background: linear-gradient(90deg, rgba(0,0,0,0.03) 25%, rgba(0,0,0,0.06) 37%, rgba(0,0,0,0.03) 63%);
-  background-size: 800px 100%;
-  animation: shimmer 1.6s infinite linear;
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(1.08);
+  }
 }
 
-/* ---------- Leaflet clean light theme ---------- */
-.leaflet-container {
-  background: #f8fafc;
-  font-family: var(--font-sans);
-}
-.leaflet-tile {
-  filter: saturate(1.05) brightness(1.02);
-}
-.leaflet-control-zoom a {
-  background: #ffffff !important;
-  color: #0f172a !important;
-  border-color: rgba(0,0,0,0.08) !important;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
-}
-.leaflet-control-zoom a:hover { color: #10b981 !important; background: #f8fafc !important; }
-.leaflet-control-attribution {
-  background: rgba(255, 255, 255, 0.85) !important;
-  color: #64748b !important;
-}
-.leaflet-control-attribution a { color: #10b981 !important; }
-.leaflet-popup-content-wrapper, .leaflet-popup-tip {
-  background: #ffffff !important;
-  color: #0f172a !important;
-  border: 1px solid rgba(0,0,0,0.06);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
 }
 
-/* Fleet marker */
-.fleet-marker { position: relative; }
+/* Tactical scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--debossed-slot);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--mechanical-screw);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--screw-head-dark);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Color alias classes */
+.text-main { color: var(--text-primary); }
+.text-sub { color: var(--text-secondary); }
+.text-dim { color: var(--text-subtle); }
+.bg-chassis { background-color: var(--page-bg); }
+.bg-milled { background-color: var(--card-bg); }
+.border-matrix { border-color: var(--border-main); }

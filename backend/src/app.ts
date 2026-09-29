@@ -47,12 +47,14 @@ app.use('/api/', apiLimiter);
 const uploadPath = path.resolve(process.env.LOCAL_STORAGE_DIR || './uploads');
 app.use('/uploads', express.static(uploadPath));
 app.use('/orders-client', express.static(path.join(__dirname, '../../web/orders-client')));
+app.use('/dispatch', express.static(path.join(__dirname, '../../web/order-dispatch')));
 
 // API spec mounting
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Mount main routing endpoint
 app.use('/api/v1', apiRouter);
+app.use('/api', apiRouter);
 
 // Service health-check
 app.get('/health', (_req, res) => {

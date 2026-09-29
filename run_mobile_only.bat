@@ -1,7 +1,8 @@
 @echo off
-title FleetGuard AI - Flutter Mobile App Launcher
+title Smart Driving Behaviour & Risk Monitoring System - Flutter Mobile App Launcher
 echo ========================================================
-echo   FleetGuard AI - Setup and Launch Flutter Mobile App Only
+echo   Smart Driving Behaviour & Risk Monitoring System
+echo   Setup and Launch Flutter Mobile App Only
 echo ========================================================
 echo.
 
@@ -26,8 +27,7 @@ call flutter pub get
 
 :: 3. Launch App
 echo.
-echo Launching Flutter application...
-start "FleetGuard-Mobile-App" cmd /k "flutter run"
+start "SmartDrive-Mobile-App" cmd /k "set "ANDROID_PREFS_ROOT=" && set "ANDROID_USER_HOME=" && set "ANDROID_SDK_HOME=" && set "JAVA_HOME=C:\Program Files\Java\jdk-17" && flutter run"
 
 cd ..
 echo ========================================================

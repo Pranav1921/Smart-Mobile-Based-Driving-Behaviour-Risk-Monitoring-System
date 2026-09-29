@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { 
-  Award, ShieldCheck, TrendingUp, AlertTriangle, 
+  Award, ShieldCheck, TrendingUp, TriangleAlert as AlertTriangle,
   Search, ArrowUpDown, ChevronRight, Zap, Flame, Trophy 
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";

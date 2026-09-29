@@ -1,0 +1,21 @@
+[
+  {
+    "id": "ord_1790526657424",
+    "customerName": "ABC",
+    "items": [
+      "AAS"
+    ],
+    "amount": 120,
+    "status": "ASSIGNED",
+    "deliveryFrom": "Main Logistics Hub, Puttur Taluk",
+    "deliveryLocation": {
+      "latitude": 12.7799,
+      "longitude": 75.2083,
+      "address": "wwusb"
+    },
+    "createdAt": "2026-09-27T16:30:57.447Z",
+    "assignedDriverId": "DRV-PUT-2026-881",
+    "assignedDriverName": "pranav Applicant",
+    "assignedAt": "2026-09-27T16:31:01.072Z"
+  }
+]

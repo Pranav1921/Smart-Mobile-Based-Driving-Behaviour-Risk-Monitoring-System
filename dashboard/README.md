@@ -1,6 +1,6 @@
-# FleetGuard AI — Admin Dashboard
+# SmartDrive — Admin Dashboard
 
-Enterprise AI Fleet Intelligence dashboard for the **Smart Mobile-Based Driving Behaviour & Risk Monitoring System**.
+Enterprise AI Driving Risk Intelligence dashboard for the **Smart Mobile-Based Driving Behaviour & Risk Monitoring System**.
 Dark-navy glass UI, live Leaflet fleet map, AI insight cards, animated KPIs and safety analytics.
 
 ## Tech Stack
@@ -65,4 +65,4 @@ The app is a static SPA (Vite) and deploys to Vercel with no server config.
 
 No environment variables are required (the dashboard runs on mock data).
 
-Part of the **FleetGuard AI** project · dashboard module.
+Part of the **Smart Mobile-Based Driving Behaviour & Risk Monitoring System** project · dashboard module.

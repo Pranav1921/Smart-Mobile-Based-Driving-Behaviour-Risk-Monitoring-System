@@ -1,11 +1,11 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { Shield, Lock, Mail, AlertTriangle } from "lucide-react";
+import { Shield, Lock, Mail, TriangleAlert as AlertTriangle } from "lucide-react";
 import apiClient from "../api/apiClient";
 
 export default function LoginPage({ onLoginSuccess }) {
   const [email, setEmail] = useState("admin@acmelogistics.com");
-  const [password, setPassword] = useState("FleetGuard2026!");
+  const [password, setPassword] = useState("SmartDrive2026!");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -58,8 +58,8 @@ export default function LoginPage({ onLoginSuccess }) {
           <div className="p-4 bg-orange-500/10 rounded-2xl border border-orange-500/20 mb-4">
             <Shield className="w-8 h-8 text-orange-500" />
           </div>
-          <h1 className="text-2xl font-black text-white uppercase tracking-wider">FleetGuard AI</h1>
-          <p className="text-slate-500 text-[10px] tracking-widest font-black uppercase mt-1">Command Control Center</p>
+          <h1 className="text-2xl font-black text-white uppercase tracking-wider">Smart Driving AI</h1>
+          <p className="text-slate-500 text-[10px] tracking-widest font-black uppercase mt-1">Driving Risk Monitoring Center</p>
         </div>
 
         {error && (
@@ -80,7 +80,7 @@ export default function LoginPage({ onLoginSuccess }) {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="bg-transparent outline-none w-full text-white text-sm"
-                placeholder="admin@fleetguard.ai"
+                placeholder="admin@smartdrive.ai"
               />
             </div>
           </div>

@@ -15,4 +15,7 @@ export default defineConfig({
     port: 5173,
     host: true,
   },
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'react-dom/client'],
+  },
 })

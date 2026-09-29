@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Search, Bell, Sun, Moon, ChevronDown, Cloud, Command, Menu, ShieldAlert } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import { useTheme } from '@/lib/theme'
+import { useSocket } from '@/hooks/SocketContext'
+import { Menu, Clock, Calendar, Moon, Sun, MapPin, Radio, ShieldCheck, Activity } from 'lucide-react'
 import { Avatar } from '@/components/ui/Avatar'
-import { cn } from '@/lib/utils'
+import { RegionLoginModal } from '@/components/auth/RegionLoginModal'
+import { resolveActiveRegion } from '@/data/regionsData'
 
 function useClock() {
   const [now, setNow] = useState(new Date())
@@ -15,105 +18,155 @@ function useClock() {
 }
 
 export function Topbar({ onOpenMobileSidebar }: { onOpenMobileSidebar: () => void }) {
-  const { theme, toggle } = useTheme()
+  const navigate = useNavigate()
   const now = useClock()
-  const [org, setOrg] = useState('FleetGuard · Mangalore')
-  const [orgOpen, setOrgOpen] = useState(false)
+  const { theme, toggle } = useTheme()
+  const { isConnected } = useSocket()
+  const [adminName, setAdminName] = useState('System Admin')
+  const [adminRegion, setAdminRegion] = useState(() => resolveActiveRegion().name)
+  const [isRegionModalOpen, setIsRegionModalOpen] = useState(false)
 
-  const time = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
-  const date = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+  useEffect(() => {
+    const updateAdminInfo = () => {
+      const storedUser = localStorage.getItem('smartdrive_admin_user')
+      const storedRegion = localStorage.getItem('smartdrive_selected_region')
+
+      let regionName = ''
+      if (storedRegion) {
+        try {
+          const r = JSON.parse(storedRegion)
+          regionName = r.name || r.district || r.state || ''
+        } catch (e) {}
+      }
+
+      if (storedUser) {
+        try {
+          const u = JSON.parse(storedUser)
+          if (u.firstName) {
+            setAdminName(`${u.firstName} ${u.lastName || ''}`.trim())
+          }
+          if (!regionName && u.region) {
+            regionName = u.region
+          }
+        } catch (e) {}
+      }
+
+      setAdminRegion(regionName || 'Puttur Taluk Hub (KA)')
+    }
+
+    updateAdminInfo()
+    window.addEventListener('storage', updateAdminInfo)
+    window.addEventListener('smartdrive_region_updated', updateAdminInfo)
+    return () => {
+      window.removeEventListener('storage', updateAdminInfo)
+      window.removeEventListener('smartdrive_region_updated', updateAdminInfo)
+    }
+  }, [])
+
+  const time = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  const date = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
 
   return (
-    <header className="sticky top-0 z-20 h-16 glass rounded-none border-b border-slate-100 flex items-center gap-2 sm:gap-3 px-3 sm:px-5">
-      {/* Hamburger + compact brand (mobile / tablet only) */}
-      <button onClick={onOpenMobileSidebar}
-        className="grid place-items-center h-10 w-10 rounded-xl bg-slate-50 border border-slate-200 text-secondary hover:text-[#10b981] hover:border-[#10b981]/30 transition-colors lg:hidden shrink-0">
-        <Menu className="h-[18px] w-[18px]" />
-      </button>
-      <div className="flex items-center gap-2 lg:hidden shrink-0">
-        <div className="grid place-items-center h-8 w-8 rounded-lg accent-gradient ring-glow">
-          <ShieldAlert className="h-4 w-4 text-white" />
+    <header className="sticky top-0 z-20 h-18 bg-[var(--card-bg)]/95 backdrop-blur-md border-b-[1.5px] border-[var(--border-main)] flex items-center justify-between px-6 sm:px-8 shadow-sm transition-colors">
+      {/* Left: Mobile Toggle & Mechanical Telemetry Clock */}
+      <div className="flex items-center gap-5">
+        <motion.button
+          whileTap={{ scale: 0.92 }}
+          onClick={onOpenMobileSidebar}
+          className="p-2.5 rounded-xl border-[1.5px] border-[var(--border-main)] bg-[var(--debossed-slot)] text-[var(--text-primary)] hover:border-[var(--border-highlight)] lg:hidden transition-colors cursor-pointer"
+        >
+          <Menu className="h-5 w-5" />
+        </motion.button>
+
+        {/* Telemetry Clock & Calendar in JetBrains Mono */}
+        <div className="hidden md:flex items-center gap-6 font-tech text-xs text-[var(--text-secondary)] font-bold">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--debossed-slot)] border border-[var(--border-main)]/60">
+            <Clock size={13} className="text-[#E53935]" />
+            <span className="tabular-nums tracking-wider text-[var(--text-primary)] font-bold">{time}</span>
+          </div>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--debossed-slot)] border border-[var(--border-main)]/60">
+            <Calendar size={13} className="text-[#2563EB]" />
+            <span className="tracking-wide text-[var(--text-primary)]">{date}</span>
+          </div>
         </div>
-        <span className="hidden min-[400px]:block font-display font-bold text-[14px] text-primary">FleetGuard<span className="text-accent-gradient"> AI</span></span>
       </div>
 
-      {/* Search */}
-      <div className="relative flex-1 max-w-md hidden sm:block">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" />
-        <input
-          placeholder="Search drivers, vehicles, trips…"
-          className="w-full h-10 rounded-xl bg-slate-50 border border-slate-200 pl-9 pr-16 text-[13px] text-primary placeholder:text-muted outline-none focus:border-[#10b981]/40 focus:bg-white transition-all shadow-inner"
-        />
-        <kbd className="absolute right-3 top-1/2 -translate-y-1/2 hidden md:flex items-center gap-0.5 text-[10px] text-muted border border-slate-200 bg-white rounded px-1.5 py-0.5 shadow-sm">
-          <Command className="h-2.5 w-2.5" />K
-        </kbd>
-      </div>
+      {/* Right: Telemetry Link Badge, Regional Sector Badge, Theme Switcher & Commander Profile */}
+      <div className="flex items-center gap-3 sm:gap-4">
+        {/* Active Regional Command Sector Indicator */}
+        <div 
+          onClick={() => setIsRegionModalOpen(true)}
+          className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-xl border-[1.5px] border-emerald-500/40 bg-[var(--debossed-slot)] hover:border-emerald-400 cursor-pointer transition shadow-inner group"
+          title="Click to Switch Regional Jurisdiction (States, Districts, Taluks)"
+        >
+          <MapPin size={12} className="text-[#10B981] animate-pulse group-hover:scale-110 transition-transform" />
+          <span className="font-tech text-[10px] font-bold uppercase tracking-wider text-[var(--text-primary)]">
+            SECTOR: <span className="text-[#10B981] font-space font-black">{adminRegion}</span>
+          </span>
+          <span className="text-[9px] bg-emerald-500/10 text-emerald-400 font-bold px-1.5 py-0.5 rounded border border-emerald-500/20 uppercase tracking-tighter">
+            CHANGE
+          </span>
+        </div>
 
-      <div className="flex-1" />
+        {/* Real-Time WebSocket Telemetry Health Badge */}
+        <div className="hidden sm:flex items-center gap-2 px-3.5 py-1.5 rounded-xl border-[1.5px] border-[var(--border-main)] bg-[var(--debossed-slot)] shadow-inner">
+          <span className="relative flex h-2 w-2">
+            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isConnected ? 'bg-[#10B981]' : 'bg-[#EF4444]'}`} />
+            <span className={`relative inline-flex rounded-full h-2 w-2 ${isConnected ? 'bg-[#10B981]' : 'bg-[#EF4444]'}`} />
+          </span>
+          <span className="font-tech text-[10px] font-bold uppercase tracking-wider text-[var(--text-primary)]">
+            {isConnected ? 'NODE LINK: 20Hz' : 'DISCONNECTED'}
+          </span>
+        </div>
 
-      {/* Search icon (small screens, when full search is hidden) */}
-      <button className="grid place-items-center h-10 w-10 rounded-xl bg-slate-50 border border-slate-200 text-secondary hover:text-[#10b981] hover:border-[#10b981]/30 transition-colors sm:hidden shrink-0">
-        <Search className="h-[18px] w-[18px]" />
-      </button>
-
-      {/* Org selector */}
-      <div className="relative hidden lg:block">
-        <button onClick={() => setOrgOpen((o) => !o)}
-          className="flex items-center gap-2 h-10 px-3 rounded-xl bg-slate-50 border border-slate-200 hover:border-[#10b981]/30 transition-colors text-[13px] text-secondary">
-          <span className="h-2 w-2 rounded-full accent-gradient" />
-          <span className="text-primary font-medium">{org}</span>
-          <ChevronDown className="h-3.5 w-3.5" />
-        </button>
-        <AnimatePresence>
-          {orgOpen && (
-            <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }}
-              className="absolute right-0 mt-2 w-56 glass rounded-xl p-1.5 z-50">
-              {['FleetGuard · Mangalore', 'Amazon Logistics · South', 'Swiggy · Coastal Hub', 'BlueDart · Karnataka'].map((o) => (
-                <button key={o} onClick={() => { setOrg(o); setOrgOpen(false) }}
-                  className={cn('w-full text-left px-3 py-2 rounded-lg text-[13px] hover:bg-slate-50 transition-colors',
-                    o === org ? 'text-[#10b981]' : 'text-secondary')}>{o}</button>
-              ))}
-            </motion.div>
+        {/* Tactile Theme Switcher */}
+        <motion.button
+          whileTap={{ scale: 0.90, rotate: 15 }}
+          onClick={toggle}
+          className="h-10 w-10 rounded-xl border-[1.5px] border-[var(--border-main)] bg-[var(--debossed-slot)] text-[var(--text-primary)] hover:border-[var(--border-highlight)] transition-colors grid place-items-center cursor-pointer shadow-sm"
+          title={`Switch to ${theme === 'light' ? 'Dark' : 'Light'} Mode`}
+        >
+          {theme === 'light' ? (
+            <Moon size={16} className="text-[var(--text-primary)]" />
+          ) : (
+            <Sun size={16} className="text-[#D97706]" />
           )}
-        </AnimatePresence>
+        </motion.button>
+
+        <div className="h-6 w-px bg-[var(--border-main)] hidden sm:block" />
+
+        {/* Commander Profile Plate with Actual Regional Command */}
+        <motion.div
+          whileTap={{ scale: 0.98 }}
+          onClick={() => navigate('/profile')}
+          className="flex items-center gap-3 px-3 py-1.5 rounded-xl border-[1.5px] border-[var(--border-main)] bg-[var(--debossed-slot)] hover:border-[var(--border-highlight)] transition-colors cursor-pointer group shadow-sm"
+        >
+          <div className="text-right hidden sm:block max-w-[150px]">
+            <p className="font-space text-xs font-bold text-[var(--text-primary)] uppercase tracking-tight leading-none group-hover:text-[#E53935] transition-colors truncate">
+              {adminName}
+            </p>
+            <p className="font-tech text-[9px] text-[#E53935] font-bold uppercase tracking-wider mt-1 flex items-center justify-end gap-1 truncate" title={adminRegion}>
+              <MapPin size={9} className="shrink-0 text-[#E53935]" />
+              <span className="truncate">{adminRegion}</span>
+            </p>
+          </div>
+          <Avatar
+            name={adminName}
+            size={32}
+            className="ring-2 ring-[var(--border-main)] group-hover:ring-[#E53935] transition-all"
+          />
+        </motion.div>
       </div>
 
-      {/* Weather */}
-      <div className="hidden xl:flex items-center gap-2 h-10 px-3 rounded-xl bg-slate-50 border border-slate-200 text-[13px]">
-        <Cloud className="h-4 w-4 text-[#10b981]" />
-        <span className="text-primary font-medium">29°C</span>
-        <span className="text-muted">Mangalore</span>
-      </div>
-
-      {/* Clock */}
-      <div className="hidden md:flex flex-col items-end leading-none shrink-0">
-        <span className="font-display text-[15px] font-semibold text-primary tabular-nums">{time}</span>
-        <span className="text-[10px] text-muted mt-0.5">{date}</span>
-      </div>
-
-      {/* Theme */}
-      <button onClick={toggle} className="grid place-items-center h-10 w-10 rounded-xl bg-slate-50 border border-slate-200 hover:border-[#10b981]/30 text-secondary hover:text-[#10b981] transition-colors shrink-0">
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.span key={theme} initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.2 }}>
-            {theme === 'dark' ? <Moon className="h-[18px] w-[18px]" /> : <Sun className="h-[18px] w-[18px]" />}
-          </motion.span>
-        </AnimatePresence>
-      </button>
-
-      {/* Notifications */}
-      <button className="relative grid place-items-center h-10 w-10 rounded-xl bg-slate-50 border border-slate-200 hover:border-[#10b981]/30 text-secondary hover:text-[#10b981] transition-colors shrink-0">
-        <Bell className="h-[18px] w-[18px]" />
-        <span className="absolute top-2 right-2.5 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-[var(--color-navy-900)] animate-pulse-glow" />
-      </button>
-
-      {/* Profile */}
-      <button className="flex items-center gap-2 pl-1 pr-1 sm:pr-2 h-10 rounded-xl hover:bg-slate-50 transition-colors shrink-0">
-        <Avatar name="Mohammed Afzal" size={32} />
-        <div className="hidden xl:block text-left leading-none">
-          <div className="text-[13px] font-medium text-primary">Mohammed Afzal</div>
-          <div className="text-[10px] text-muted mt-0.5">Fleet Administrator</div>
-        </div>
-      </button>
+      {isRegionModalOpen && (
+        <RegionLoginModal
+          onClose={() => setIsRegionModalOpen(false)}
+          onSelectRegion={(reg) => {
+            setAdminRegion(reg.name)
+            setIsRegionModalOpen(false)
+          }}
+        />
+      )}
     </header>
   )
 }

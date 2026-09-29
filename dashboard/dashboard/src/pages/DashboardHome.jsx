@@ -43,8 +43,12 @@ export default function DashboardHome({ user, onLogout }) {
       
       // Add mock coordinates and metrics for visual representation if empty
       const mapped = list.map((d, index) => {
+        // Only mock coordinates if the driver doesn't have live latitude/longitude from backend
+        const hasLiveCoords = d.latitude !== undefined && d.longitude !== undefined;
+
         const offsetLat = (index % 2 === 0 ? 0.015 : -0.015) * (index + 1);
         const offsetLng = (index % 2 === 0 ? -0.022 : 0.022) * (index + 1);
+
         return {
           id: d.id,
           name: `${d.user?.firstName || 'Driver'} ${d.user?.lastName || ''}`,
@@ -52,10 +56,10 @@ export default function DashboardHome({ user, onLogout }) {
           status: d.status || "ACTIVE",
           safetyScore: d.safetyScore,
           riskScore: d.riskScore,
-          speed: d.status === "ON_TRIP" ? 45 + (index * 12) % 40 : 0,
+          speed: d.speed !== undefined ? d.speed : (d.status === "ON_TRIP" ? 45 + (index * 12) % 40 : 0),
           heading: (index * 45) % 360,
-          lat: 12.9716 + offsetLat,
-          lng: 77.5946 + offsetLng,
+          lat: hasLiveCoords ? d.latitude : 12.9716 + offsetLat,
+          lng: hasLiveCoords ? d.longitude : 77.5946 + offsetLng,
           vehicle: {
             make: "Tesla",
             model: "Model Y",
@@ -127,7 +131,7 @@ export default function DashboardHome({ user, onLogout }) {
           </div>
           <div>
             <h1 className="text-xl font-black text-white flex items-center gap-1.5">
-              FleetGuard <span className="text-orange-500 font-extrabold">AI</span>
+              SmartDrive <span className="text-orange-500 font-extrabold">AI</span>
             </h1>
             <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">ORGANIZATION COMMAND CENTER</p>
           </div>
@@ -201,7 +205,7 @@ export default function DashboardHome({ user, onLogout }) {
                 <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-3">
                   <div className="flex items-center gap-1 text-slate-400">
                     <Gauge className="w-3.5 h-3.5" />
-                    <span className="text-xs font-bold">{d.speed} km/h</span>
+                    <span className="text-xs font-bold">{(d.speed || 0).toFixed(1)} km/h</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="text-[10px] text-slate-500 font-bold">Safety Score:</span>
@@ -240,7 +244,7 @@ export default function DashboardHome({ user, onLogout }) {
                     <h3 className="font-bold text-sm text-white">{d.name}</h3>
                     <p className="text-xs text-slate-400 mt-1">{d.vehicle.make} {d.vehicle.model} ({d.vehicle.plate})</p>
                     <div className="flex items-center gap-2 mt-2 pt-2 border-t border-white/5 justify-between">
-                      <span className="text-[10px] font-bold uppercase text-slate-500">Speed: {d.speed} km/h</span>
+                      <span className="text-[10px] font-bold uppercase text-slate-500">Speed: {(d.speed || 0).toFixed(1)} km/h</span>
                       <span className="text-[10px] font-bold text-emerald-400">Score: {d.safetyScore}</span>
                     </div>
                   </div>
@@ -323,7 +327,7 @@ export default function DashboardHome({ user, onLogout }) {
                 </div>
                 <div className="flex justify-between items-center py-3 border-b border-white/5">
                   <span className="text-xs font-bold text-slate-400">Current Speed</span>
-                  <span className="text-sm font-black text-orange-500">{selectedDriver.speed} km/h</span>
+                  <span className="text-sm font-black text-orange-500">{(selectedDriver.speed || 0).toFixed(1)} km/h</span>
                 </div>
               </div>
 

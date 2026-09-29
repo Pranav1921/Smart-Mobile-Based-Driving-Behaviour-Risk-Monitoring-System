@@ -65,6 +65,7 @@ enum EmergencyStatus {
 enum FileType {
   IMAGE
   VIDEO
+  AUDIO
   DOCUMENT
 }
 
@@ -76,6 +77,11 @@ enum NotificationType {
   GPS_LOST
   EMERGENCY
   SYSTEM
+}
+
+enum DriverType {
+  TACTICAL
+  STANDARD
 }
 
 model Organization {
@@ -103,8 +109,10 @@ model User {
   passwordHash   String   @map("password_hash")
   firstName      String   @map("first_name")
   lastName       String   @map("last_name")
+  phoneNumber    String?  @map("phone_number")
   role           Role     @default(DRIVER)
   organizationId String?  @db.Uuid @map("organization_id")
+  zone           String?  @default("puttur_taluk")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
@@ -124,12 +132,16 @@ model Driver {
   emergencyContactName  String   @map("emergency_contact_name")
   emergencyContactPhone String   @map("emergency_contact_phone")
   status                String   @default("ACTIVE") // ACTIVE, INACTIVE, ON_TRIP
+  driverType            DriverType @default(TACTICAL) @map("driver_type")
   safetyScore           Float    @default(100.0) @map("safety_score")
   riskScore             Float    @default(0.0) @map("risk_score")
   xp                    Int      @default(0)
   level                 Int      @default(1)
   streak                Int      @default(0)
   badges                String[] @default([])
+  latitude              Float?   @map("latitude")
+  longitude             Float?   @map("longitude")
+  lastSeen              DateTime? @map("last_seen")
   createdAt             DateTime @default(now()) @map("created_at")
   updatedAt             DateTime @updatedAt @map("updated_at")
 
@@ -193,6 +205,10 @@ model Trip {
   avgSpeed       Float      @default(0.0) @map("avg_speed") // in km/h
   maxSpeed       Float      @default(0.0) @map("max_speed") // in km/h
   polyline       String?    @db.Text
+  deliveryFrom   String?    @map("delivery_from")
+  deliveryTo     String?    @map("delivery_to")
+  orderItems     String?    @map("order_items")
+  orderId        String?    @map("order_id")
   createdAt      DateTime   @default(now()) @map("created_at")
   updatedAt      DateTime   @updatedAt @map("updated_at")
 

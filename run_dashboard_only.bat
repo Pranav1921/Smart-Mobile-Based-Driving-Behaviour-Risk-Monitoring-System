@@ -1,13 +1,14 @@
 @echo off
-title FleetGuard AI - Dashboard Launcher
+title Smart Driving Behaviour & Risk Monitoring System - Dashboard Launcher
 echo ========================================================
-echo   FleetGuard AI - Starting React Admin HUD
+echo   Smart Driving Risk Intelligence - Starting React Admin HUD
 echo ========================================================
 echo.
 
 cd dashboard
-if not exist node_modules (
-    echo Installing npm dependencies for dashboard...
+if not exist node_modules\rollup\dist\es\parseAst.js (
+    echo Incomplete or corrupted packages detected. Reinstalling cleanly...
+    if exist node_modules rd /s /q node_modules
     call npm install
 )
 echo Starting React Admin Dashboard...

@@ -13,6 +13,12 @@ class DriverTrip {
   final List<List<double>> routeCoordinates; // [[lat, lng], [lat, lng], ...]
   final String industry;
   final String vehicleName;
+  final String? deliveryFrom;
+  final String? deliveryTo;
+  final String? orderItems;
+  final String? orderId;
+  final double? payout;
+  final int? pointsEarned;
 
   DriverTrip({
     required this.id,
@@ -27,7 +33,15 @@ class DriverTrip {
     required this.routeCoordinates,
     required this.industry,
     required this.vehicleName,
+    this.deliveryFrom,
+    this.deliveryTo,
+    this.orderItems,
+    this.orderId,
+    this.payout,
+    this.pointsEarned,
   });
+
+  double get earnedPayout => payout ?? (distanceKm > 0 ? (distanceKm * 15.0) : 75.0);
 
   Map<String, dynamic> toJson() {
     return {
@@ -43,6 +57,12 @@ class DriverTrip {
       'routeCoordinates': routeCoordinates,
       'industry': industry,
       'vehicleName': vehicleName,
+      'deliveryFrom': deliveryFrom,
+      'deliveryTo': deliveryTo,
+      'orderItems': orderItems,
+      'orderId': orderId,
+      'payout': earnedPayout,
+      'pointsEarned': pointsEarned,
     };
   }
 
@@ -69,6 +89,12 @@ class DriverTrip {
       routeCoordinates: coords,
       industry: json['industry'] ?? 'Logistics',
       vehicleName: json['vehicleName'] ?? 'Unknown Vehicle',
+      deliveryFrom: json['deliveryFrom'],
+      deliveryTo: json['deliveryTo'],
+      orderItems: json['orderItems'],
+      orderId: json['orderId'],
+      payout: (json['payout'] as num?)?.toDouble() ?? (json['distanceKm'] != null && (json['distanceKm'] as num) > 0 ? ((json['distanceKm'] as num).toDouble() * 15.0) : 75.0),
+      pointsEarned: json['pointsEarned'] as int?,
     );
   }
 }

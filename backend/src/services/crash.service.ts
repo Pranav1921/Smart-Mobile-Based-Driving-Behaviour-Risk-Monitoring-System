@@ -82,8 +82,12 @@ export class CrashService {
       throw new NotFoundError('Crash report not found');
     }
 
-    const folder = fileType === FileType.IMAGE ? 'crashes/images' : 'crashes/videos';
+    const folder = fileType === FileType.IMAGE ? 'crashes/images' : fileType === FileType.VIDEO ? 'crashes/videos' : 'crashes/audio';
     const upload = await storageProvider.uploadFile(file, folder);
+
+    let purpose = 'CRASH_IMAGE';
+    if (fileType === FileType.VIDEO) purpose = 'CRASH_VIDEO';
+    else if (fileType === FileType.AUDIO) purpose = 'CRASH_AUDIO';
 
     return crashRepository.addMedia({
       organizationId: report.organizationId,
@@ -91,7 +95,7 @@ export class CrashService {
       url: upload.url,
       publicId: upload.publicId || null,
       fileType,
-      purpose: fileType === FileType.IMAGE ? 'CRASH_IMAGE' : 'CRASH_VIDEO',
+      purpose,
     });
   }
 

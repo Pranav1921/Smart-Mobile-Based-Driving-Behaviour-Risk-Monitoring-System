@@ -1,47 +1,45 @@
-version: '3.8'
-
 services:
   db:
     image: postgres:15-alpine
-    container_name: fleetguard-postgres
+    container_name: smartdrive-postgres
     restart: always
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: fleetguard_db
+      POSTGRES_DB: smartdrive_db
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     networks:
-      - fleetguard-network
+      - smartdrive-network
 
   redis:
     image: redis:7-alpine
-    container_name: fleetguard-redis
+    container_name: smartdrive-redis
     restart: always
     ports:
       - "6379:6379"
     volumes:
       - redisdata:/data
     networks:
-      - fleetguard-network
+      - smartdrive-network
 
   app:
     build:
       context: .
       dockerfile: docker/Dockerfile
-    container_name: fleetguard-backend
+    container_name: smartdrive-backend
     restart: always
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/fleetguard_db?schema=public
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/smartdrive_db?schema=public
       - REDIS_URL=redis://redis:6379
-      - JWT_ACCESS_SECRET=super-secret-access-key-fleetguard-ai-2026
-      - JWT_REFRESH_SECRET=super-secret-refresh-key-fleetguard-ai-2026
+      - JWT_ACCESS_SECRET=super-secret-access-key-smartdrive-ai-2026
+      - JWT_REFRESH_SECRET=super-secret-refresh-key-smartdrive-ai-2026
       - JWT_ACCESS_EXPIRY=15m
       - JWT_REFRESH_EXPIRY=7d
       - LOCAL_STORAGE_DIR=/app/uploads
@@ -53,7 +51,7 @@ services:
       - /app/node_modules
       - uploads-data:/app/uploads
     networks:
-      - fleetguard-network
+      - smartdrive-network
 
 volumes:
   pgdata:
@@ -64,5 +62,5 @@ volumes:
     driver: local
 
 networks:
-  fleetguard-network:
+  smartdrive-network:
     driver: bridge

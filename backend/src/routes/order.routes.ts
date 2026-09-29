@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
+import { socketManager } from '../sockets/socket.manager';
 
 const router = Router();
 const ORDERS_FILE = path.join(__dirname, '../../orders.json');
@@ -23,17 +24,25 @@ const writeOrders = (orders: any[]) => {
 };
 
 // GET /orders
-router.get('/', (req: Request, res: Response) => {
+router.get('/', (_req: Request, res: Response) => {
   const orders = readOrders();
   res.json({ success: true, data: orders });
 });
 
+// GET /orders/pending
+router.get('/pending', (_req: Request, res: Response) => {
+  const orders = readOrders();
+  const pending = orders.filter((o: any) => o.status === 'PENDING');
+  res.json({ success: true, data: pending });
+});
+
 // POST /orders
 router.post('/', (req: Request, res: Response) => {
-  const { customerName, items, amount, deliveryLocation } = req.body;
+  const { customerName, items, amount, deliveryLocation, deliveryFrom } = req.body;
   
   if (!customerName || !items || !deliveryLocation) {
-    return res.status(400).json({ success: false, message: 'Missing fields' });
+    res.status(400).json({ success: false, message: 'Missing fields' });
+    return;
   }
 
   const orders = readOrders();
@@ -43,6 +52,7 @@ router.post('/', (req: Request, res: Response) => {
     items,
     amount: amount || 0,
     status: 'PENDING',
+    deliveryFrom: deliveryFrom || 'Main Logistics Depot',
     deliveryLocation: {
       latitude: parseFloat(deliveryLocation.latitude) || 19.0760, // default Mumbai
       longitude: parseFloat(deliveryLocation.longitude) || 72.8777,
@@ -55,6 +65,56 @@ router.post('/', (req: Request, res: Response) => {
   writeOrders(orders);
 
   res.status(201).json({ success: true, data: newOrder });
+});
+
+// POST /orders/:id/assign — push job to a specific driver via socket
+router.post('/:id/assign', (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { driverId, driverName } = req.body;
+
+  if (!driverId) {
+    res.status(400).json({ success: false, message: 'driverId is required' });
+    return;
+  }
+
+  const orders = readOrders();
+  const orderIdx = orders.findIndex((o: any) => o.id === id);
+
+  if (orderIdx === -1) {
+    res.status(404).json({ success: false, message: 'Order not found' });
+    return;
+  }
+
+  // Update order state
+  orders[orderIdx].status = 'ASSIGNED';
+  orders[orderIdx].assignedDriverId = driverId;
+  orders[orderIdx].assignedDriverName = driverName || 'Driver';
+  orders[orderIdx].assignedAt = new Date().toISOString();
+  writeOrders(orders);
+
+  const order = orders[orderIdx];
+
+  // Push job_assigned to the driver's personal socket room
+  socketManager.sendToUser(driverId, 'job_assigned', {
+    orderId: order.id,
+    customerName: order.customerName,
+    items: order.items,
+    amount: order.amount,
+    deliveryFrom: order.deliveryFrom || 'Main Dispatch Hub',
+    deliveryTo: order.deliveryLocation?.address || 'Customer Address',
+    deliveryLocation: order.deliveryLocation,
+    assignedAt: order.assignedAt,
+  });
+
+  // Also broadcast status update to admin dashboard org room
+  socketManager.broadcastToOrg('demo-org', 'order_assigned', {
+    orderId: order.id,
+    driverId,
+    driverName: driverName || 'Driver',
+    status: 'ASSIGNED',
+  });
+
+  res.json({ success: true, data: order });
 });
 
 export default router;

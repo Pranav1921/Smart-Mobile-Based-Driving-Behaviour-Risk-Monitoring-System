@@ -21,7 +21,8 @@ export const registerSchema = z.object({
 
 export const loginSchema = z.object({
   body: z.object({
-    email: z.string().email({ message: 'Invalid email address syntax' }),
+    email: z.string().optional(),
+    driverId: z.string().optional(),
     password: z.string().min(1, { message: 'Password field cannot be empty' }),
   }),
 });

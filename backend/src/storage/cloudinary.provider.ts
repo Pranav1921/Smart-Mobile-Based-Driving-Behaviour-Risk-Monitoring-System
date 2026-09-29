@@ -38,7 +38,7 @@ export class CloudinaryProvider implements StorageProvider {
 
     return new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
-        { folder: `fleetguard/${folder}` },
+        { folder: `smartdrive/${folder}` },
         (error, result) => {
           if (error) {
             logger.error('Cloudinary upload stream failed:', error);

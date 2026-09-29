@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: 'fleetguard-backend',
+      name: 'smartdrive-backend',
       script: './dist/server.js',
       instances: 'max',
       exec_mode: 'cluster',

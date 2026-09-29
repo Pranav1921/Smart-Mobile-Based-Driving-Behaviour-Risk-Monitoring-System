@@ -12,7 +12,13 @@ export class TripService {
   async startTrip(
     driverId: string,
     vehicleId: string,
-    organizationId: string
+    organizationId: string,
+    deliveryDetails?: {
+      deliveryFrom?: string;
+      deliveryTo?: string;
+      orderItems?: string;
+      orderId?: string;
+    }
   ): Promise<Trip> {
     const driver = await driverRepository.findById(driverId);
     if (!driver) throw new NotFoundError('Driver profile not found');
@@ -37,6 +43,10 @@ export class TripService {
       organizationId,
       status: TripStatus.ONGOING,
       startTime: new Date(),
+      deliveryFrom: deliveryDetails?.deliveryFrom,
+      deliveryTo: deliveryDetails?.deliveryTo,
+      orderItems: deliveryDetails?.orderItems,
+      orderId: deliveryDetails?.orderId,
     });
   }
 
@@ -100,7 +110,13 @@ export class TripService {
       await aiEvaluationQueue.add('evaluate-trip', { tripId });
       logger.info(`Enqueued trip safety check: ${tripId}`);
     } catch (err) {
-      logger.error('Failed to enqueue trip evaluation job:', err);
+      logger.warn('Redis queue unavailable, evaluating trip directly with AI engine:', err);
+      try {
+        const { aiService } = await import('../ai/ai.service');
+        await aiService.evaluateTripSafety(tripId);
+      } catch (evalErr) {
+        logger.error('Direct trip evaluation error:', evalErr);
+      }
     }
 
     return updatedTrip;
@@ -135,15 +151,15 @@ export class TripService {
   }
 
   async getTripsList(
-    organizationId: string,
-    query: { skip?: number; take?: number; driverId?: string }
+    organizationId?: string,
+    query: { skip?: number; take?: number; driverId?: string } = {}
   ) {
-    const where: any = { organizationId };
+    const where: any = organizationId ? { organizationId } : {};
     if (query.driverId) {
       where.driverId = query.driverId;
     }
     const skip = Number(query.skip) || 0;
-    const take = Number(query.take) || 10;
+    const take = Number(query.take) || 50;
 
     const trips = await tripRepository.findMany({
       skip,

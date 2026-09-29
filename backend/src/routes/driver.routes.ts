@@ -19,6 +19,41 @@ router.get(
   driverController.getList
 );
 
+// Regional Safety & Eco-Driving Leaderboard
+router.get(
+  '/leaderboard',
+  authorize(Role.SUPER_ADMIN, Role.FLEET_ADMIN, Role.FLEET_MANAGER, Role.DRIVER),
+  driverController.getLeaderboard
+);
+
+// Pending driver onboarding applications (Zone-aware)
+router.get(
+  '/pending',
+  authorize(Role.SUPER_ADMIN, Role.FLEET_ADMIN, Role.FLEET_MANAGER),
+  driverController.getPendingApplications
+);
+
+// Parivahan National Register DL verification
+router.post(
+  '/verify-license',
+  authorize(Role.SUPER_ADMIN, Role.FLEET_ADMIN, Role.FLEET_MANAGER),
+  driverController.verifyDrivingLicense
+);
+
+// Approve and issue credentials
+router.post(
+  '/:id/approve',
+  authorize(Role.SUPER_ADMIN, Role.FLEET_ADMIN, Role.FLEET_MANAGER),
+  driverController.approveApplication
+);
+
+// Reject application
+router.post(
+  '/:id/reject',
+  authorize(Role.SUPER_ADMIN, Role.FLEET_ADMIN, Role.FLEET_MANAGER),
+  driverController.rejectApplication
+);
+
 router.get('/:id', driverController.getProfile);
 
 router.put(
@@ -41,5 +76,11 @@ router.post(
 );
 
 router.get('/:id/scores-trend', driverController.getScoresTrend);
+
+router.delete(
+  '/:id',
+  authorize(Role.SUPER_ADMIN, Role.FLEET_ADMIN, Role.FLEET_MANAGER),
+  driverController.deleteDriver
+);
 
 export default router;

@@ -1,0 +1,177 @@
+%PDF-1.4
+%xE2xE3xCFxD3
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [ 5 0 R 7 0 R ] /Count 2 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >>
+endobj
+6 0 obj
+<< /Length 6960 >>
+stream
+0.5 0.5 0.5 RG 0.5 w
+45 762 m 567 762 l S
+BT /F1 8 Tf 0.4 0.4 0.4 rg 45 766 Td (SMART DRIVING BEHAVIOUR & RISK MONITORING SYSTEM | PROJECT REPORT) Tj ET
+BT /F1 8 Tf 0.4 0.4 0.4 rg 507 766 Td (Page 2) Tj ET
+0.5 0.5 0.5 RG 0.5 w
+45 35 m 567 35 l S
+BT /F1 8 Tf 0.4 0.4 0.4 rg 45 25 Td (Major Project | Complete Technical Architecture & Resume Guide) Tj ET
+BT /F1 8 Tf 0.4 0.4 0.4 rg 527 25 Td (Page 2) Tj ET
+0.1 0.3 0.6 rg 45 733 522 1.5 re f
+BT /F2 12.5 Tf 0.08 0.22 0.45 rg 45 738 Td (3. In-Depth Defense: Bullet Point 1 \(Backend Infrastructure & Telemetry\)) Tj ET
+BT /F1 9 Tf 0.15 0.18 0.22 rg 45 717 Td (Resume Text: 'Engineered a backend infrastructure using Python and PostgreSQL to ingest,) Tj ET
+BT /F1 9 Tf 0.15 0.18 0.22 rg 45 704.5 Td (process, and store high-frequency vehicle telemetry data in real time.') Tj ET
+BT /F2 10.5 Tf 0.12 0.35 0.55 rg 45 683 Td (Detailed Explanation of Every Word and Component:) Tj ET
+0.1 0.4 0.7 rg 49 671.5 3.5 3.5 re f
+BT /F2 9 Tf 0.1 0.15 0.25 rg 59 669 Td (Backend Infrastructure: Architected as a high-throughput microservice using FastAPI,) Tj ET
+BT /F1 9 Tf 0.2 0.22 0.28 rg 59 656.5 Td (an asynchronous ASGI framework built on top of Starlette and Uvicorn. It exposes REST) Tj ET
+BT /F1 9 Tf 0.2 0.22 0.28 rg 59 644 Td (and streaming endpoints capable of handling concurrent vehicular telemetry packets) Tj ET
+BT /F1 9 Tf 0.2 0.22 0.28 rg 59 631.5 Td (with non-blocking I/O.) Tj ET
+0.1 0.4 0.7 rg 49 620.5 3.5 3.5 re f
+BT /F2 9 Tf 0.1 0.15 0.25 rg 59 618 Td (Python & FastAPI Engine: Leveraged Python 3.10+ for its scientific and numerical) Tj ET
+BT /F1 9 Tf 0.2 0.22 0.28 rg 59 605.5 Td (capabilities \(NumPy, SciPy\). FastAPI ensures automatic request schema validation via) Tj ET
+BT /F1 9 Tf 0.2 0.22 0.28 rg 59 593 Td (Pydantic models, OpenAPI documentation, and sub-millisecond serialization overhead.) Tj ET
+0.1 0.4 0.7 rg 49 582 3.5 3.5 re f
+BT /F2 9 Tf 0.1 0.15 0.25 rg 59 579.5 Td (PostgreSQL Database: Designed a relational schema with tables for drivers, vehicles,) Tj ET
+BT /F1 9 Tf 0.2 0.22 0.28 rg 59 567 Td (trips, hazard events, and granular GPS/IMU breadcrumbs. Utilized indexed spatial) Tj ET
+BT /F1 9 Tf 0.2 0.22 0.28 rg 59 554.5 Td (coordinates and timestamps to support rapid analytical range queries and historical) Tj ET
+BT /F1 9 Tf 0.2 0.22 0.28 rg 59 542 Td (trip playback without table lock contention.) Tj ET
+0.1 0.4 0.7 rg 49 531 3.5 3.5 re f
+BT /F2 9 Tf 0.1 0.15 0.25 rg 59 528.5 Td (High-Frequency Vehicle Telemetry: In telematics, telemetry refers to continuous) Tj ET
+BT /F1 9 Tf 0.2 0.22 0.28 rg 59 516 Td (measurements transmitted from moving vehicles. The system streams 20 samples per) Tj ET
+BT /F1 9 Tf 0.2 0.22 0.28 rg 59 503.5 Td (second \(20 Hz\) containing 14 distinct parameters: latitude, longitude, transit speed) Tj ET
+BT /F1 9 Tf 0.2 0.22 0.28 rg 59 491 Td (\(km/h\), compass heading \(deg\), 3-axis linear acceleration \(X, Y, Z in Gs\), 3-axis) Tj ET
+BT /F1 9 Tf 0.2 0.22 0.28 rg 59 478.5 Td (angular rates \(X, Y, Z in rad/s\), road vibration rate \(m/s2\), and Unix epoch) Tj ET
+BT /F1 9 Tf 0.2 0.22 0.28 rg 59 466 Td (timestamps.) Tj ET
+0.1 0.4 0.7 rg 49 455 3.5 3.5 re f
+BT /F2 9 Tf 0.1 0.15 0.25 rg 59 452.5 Td (Ingestion, Processing & Storage: Incoming packets undergo adaptive threshold) Tj ET
+BT /F1 9 Tf 0.2 0.22 0.28 rg 59 440 Td (validation, kinematic physics calculation, and batch insertion. High-frequency) Tj ET
+BT /F1 9 Tf 0.2 0.22 0.28 rg 59 427.5 Td (coordinates are downsampled using spatial-distance delta filters \(>3 meters) Tj ET
+BT /F1 9 Tf 0.2 0.22 0.28 rg 59 415 Td (displacement\) to eliminate database bloat during red-light stops.) Tj ET
+BT /F2 10.5 Tf 0.12 0.35 0.55 rg 45 395.5 Td (Telemetry Packet Schema & Mathematical Pipeline) Tj ET
+BT /F1 9 Tf 0.15 0.18 0.22 rg 45 381.5 Td (Each incoming frame is parsed into a vector P = [lat, lng, v, theta, ax, ay, az, gx, gy, gz,) Tj ET
+BT /F1 9 Tf 0.15 0.18 0.22 rg 45 369 Td (t]. Longitudinal and lateral accelerations are normalized using local gravitational) Tj ET
+BT /F1 9 Tf 0.15 0.18 0.22 rg 45 356.5 Td (constants \(g = 9.80665 m/s2\). If network drops occur in valleys or ghat roads, the client) Tj ET
+BT /F1 9 Tf 0.15 0.18 0.22 rg 45 344 Td (buffers samples locally in SQLite/SharedPreferences and flushes them in a transactional sync) Tj ET
+BT /F1 9 Tf 0.15 0.18 0.22 rg 45 331.5 Td (upon reconnection.) Tj ET
+0.1 0.3 0.6 rg 45 304 522 1.5 re f
+BT /F2 12.5 Tf 0.08 0.22 0.45 rg 45 309 Td (4. In-Depth Defense: Bullet Point 2 \(Hardware Interfacing & Potholes\)) Tj ET
+BT /F1 9 Tf 0.15 0.18 0.22 rg 45 288 Td (Resume Text: 'Interfaced an ESP32 IMU sensor with a Flutter mobile application over BLE to) Tj ET
+BT /F1 9 Tf 0.15 0.18 0.22 rg 45 275.5 Td (capture vehicle motion dynamics and detect road hazards like potholes.') Tj ET
+BT /F2 10.5 Tf 0.12 0.35 0.55 rg 45 254 Td (Detailed Explanation of Every Word and Component:) Tj ET
+0.1 0.4 0.7 rg 49 242.5 3.5 3.5 re f
+BT /F2 9 Tf 0.1 0.15 0.25 rg 59 240 Td (ESP32 IMU Sensor: Utilizes an ESP-WROOM-32 32-bit dual-core Xtensa microcontroller) Tj ET
+BT /F1 9 Tf 0.2 0.22 0.28 rg 59 227.5 Td (coupled with an MPU-6050 6-axis MEMS motion-tracking sensor via I2C at 400 kHz. Unlike) Tj ET
+BT /F1 9 Tf 0.2 0.22 0.28 rg 59 215 Td (consumer phone sensors limited to +/-2g or +/-4g, the ESP32 registers \(0x1C\) are) Tj ET
+BT /F1 9 Tf 0.2 0.22 0.28 rg 59 202.5 Td (configured to Full Scale Range +/-16g \(2048 LSB/g\) to capture true collision) Tj ET
+BT /F1 9 Tf 0.2 0.22 0.28 rg 59 190 Td (shockwaves without saturation.) Tj ET
+0.1 0.4 0.7 rg 49 179 3.5 3.5 re f
+BT /F2 9 Tf 0.1 0.15 0.25 rg 59 176.5 Td (Interfaced Mobile Hardware over BLE: Implemented Bluetooth Low Energy \(BLE 4.2/5.0\)) Tj ET
+BT /F1 9 Tf 0.2 0.22 0.28 rg 59 164 Td (Generic Attribute Profile \(GATT\) architecture. Designed custom 128-bit Service and) Tj ET
+BT /F1 9 Tf 0.2 0.22 0.28 rg 59 151.5 Td (Characteristic UUIDs with optimized 20-byte packed binary payloads to stream telemetry) Tj ET
+BT /F1 9 Tf 0.2 0.22 0.28 rg 59 139 Td (continuously with under 15ms transmission latency and minimal battery consumption.) Tj ET
+0.1 0.4 0.7 rg 49 128 3.5 3.5 re f
+BT /F2 9 Tf 0.1 0.15 0.25 rg 59 125.5 Td (Flutter Mobile Application: Engineered using Google's cross-platform Flutter SDK) Tj ET
+BT /F1 9 Tf 0.2 0.22 0.28 rg 59 113 Td (\(Dart\). Features a decoupled reactive state architecture \(Provider\), throttled UI) Tj ET
+BT /F1 9 Tf 0.2 0.22 0.28 rg 59 100.5 Td (rebuilds \(120ms/150ms intervals\) ensuring 60 FPS fluidity on mobile hardware,) Tj ET
+BT /F1 9 Tf 0.2 0.22 0.28 rg 59 88 Td (integrated OpenStreetMap navigation, and text-to-speech audio coaching.) Tj ET
+0.1 0.4 0.7 rg 49 77 3.5 3.5 re f
+BT /F2 9 Tf 0.1 0.15 0.25 rg 59 74.5 Td (Vehicle Motion Dynamics: Vehicle dynamics describe how a vehicle moves in 3D space.) Tj ET
+BT /F1 9 Tf 0.2 0.22 0.28 rg 59 62 Td (Rigidly mounting the ESP32 node to the vehicle chassis decouples it from the phone.) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 1 0 R /F2 2 0 R /F3 3 0 R >> >> >>
+endobj
+8 0 obj
+<< /Length 5796 >>
+stream
+0.5 0.5 0.5 RG 0.5 w
+45 762 m 567 762 l S
+BT /F1 8 Tf 0.4 0.4 0.4 rg 45 766 Td (SMART DRIVING BEHAVIOUR & RISK MONITORING SYSTEM | PROJECT REPORT) Tj ET
+BT /F1 8 Tf 0.4 0.4 0.4 rg 507 766 Td (Page 5) Tj ET
+0.5 0.5 0.5 RG 0.5 w
+45 35 m 567 35 l S
+BT /F1 8 Tf 0.4 0.4 0.4 rg 45 25 Td (Major Project | Complete Technical Architecture & Resume Guide) Tj ET
+BT /F1 8 Tf 0.4 0.4 0.4 rg 527 25 Td (Page 5) Tj ET
+0.1 0.3 0.6 rg 45 733 522 1.5 re f
+BT /F2 12.5 Tf 0.08 0.22 0.45 rg 45 738 Td (7. Technical Interview Q&A Guide \(Preparing for Questions on this Project\)) Tj ET
+BT /F1 9 Tf 0.15 0.18 0.22 rg 45 717 Td (When interviewers review your resume, they will test your depth of understanding on every) Tj ET
+BT /F1 9 Tf 0.15 0.18 0.22 rg 45 704.5 Td (single claim. Here are the top questions and exact answers to master:) Tj ET
+0.96 0.98 1 rg 45 627 522 74 re f
+0.2 0.5 0.8 RG 1 w 45 627 522 74 re S
+0.2 0.5 0.8 rg 45 627 4 74 re f
+BT /F2 9.5 Tf 0.2 0.5 0.8 rg 57 686 Td (Q1: Why did you use an ESP32 hardware node when modern smartphones already have accelerometers?) Tj ET
+BT /F1 8.5 Tf 0.15 0.18 0.22 rg 57 672 Td (ANSWER: Smartphones are mechanically decoupled from the vehicle chassis. When a driver picks up their phone, adjusts navigation, or the phone) Tj ET
+BT /F1 8.5 Tf 0.15 0.18 0.22 rg 57 659.5 Td (slides on a passenger seat, it experiences 2.0g - 3.5g surges, causing false harsh-braking and crash triggers in phone-only apps.) Tj ET
+BT /F1 8.5 Tf 0.15 0.18 0.22 rg 57 647 Td (Furthermore, phone sensors are clamped by the mobile OS to +/-2g or +/-4g, causing them to clip/saturate during real crashes.) Tj ET
+BT /F1 8.5 Tf 0.15 0.18 0.22 rg 57 634.5 Td (Our ESP32 node is rigidly fixed to the chassis, has zero handheld noise, and is configured to full +/-16g collision range.) Tj ET
+0.98 0.96 1 rg 45 559.5 522 61.5 re f
+0.5 0.3 0.8 RG 1 w 45 559.5 522 61.5 re S
+0.5 0.3 0.8 rg 45 559.5 4 61.5 re f
+BT /F2 9.5 Tf 0.5 0.3 0.8 rg 57 606 Td (Q2: How does your pothole detection algorithm work mathematically?) Tj ET
+BT /F1 8.5 Tf 0.15 0.18 0.22 rg 57 592 Td (ANSWER: Potholes generate an abrupt vertical acceleration shockwave on the vehicle suspension while lateral and longitudinal forces remain low.) Tj ET
+BT /F1 8.5 Tf 0.15 0.18 0.22 rg 57 579.5 Td (Our algorithm checks three conditions simultaneously: \(1\) Vehicle transit speed >= 12 km/h \(to ignore door slams\), \(2\) Absolute vertical Z-axis) Tj ET
+BT /F1 8.5 Tf 0.15 0.18 0.22 rg 57 567 Td (force |az| >= 1.90g, and \(3\) Vertical dominance ratio |az| > horizontalG * 1.25. When all 3 pass, it geotags a pothole with a 4-second debounce.) Tj ET
+0.96 1 0.97 rg 45 492 522 61.5 re f
+0.2 0.6 0.3 RG 1 w 45 492 522 61.5 re S
+0.2 0.6 0.3 rg 45 492 4 61.5 re f
+BT /F2 9.5 Tf 0.2 0.6 0.3 rg 57 538.5 Td (Q3: How do you handle sensor noise and temporary road vibrations?) Tj ET
+BT /F1 8.5 Tf 0.15 0.18 0.22 rg 57 524.5 Td (ANSWER: We implement an Adaptive Exponential Moving Average \(EMA\) filter coupled with a calibrated deadband. At standstill \(<2 km/h\),) Tj ET
+BT /F1 8.5 Tf 0.15 0.18 0.22 rg 57 512 Td (the system auto-tares zero-bias offsets. During cruising, alpha = 0.22 provides smooth, jitter-free G-force readings, while dynamic) Tj ET
+BT /F1 8.5 Tf 0.15 0.18 0.22 rg 57 499.5 Td (spikes switch alpha = 0.65 to capture genuine harsh events without lag. Accelerations below 0.06g are clamped to zero.) Tj ET
+0.98 0.98 0.95 rg 45 424.5 522 61.5 re f
+0.6 0.5 0.2 RG 1 w 45 424.5 522 61.5 re S
+0.6 0.5 0.2 rg 45 424.5 4 61.5 re f
+BT /F2 9.5 Tf 0.6 0.5 0.2 rg 57 471 Td (Q4: How does the driver safety scoring and gamification system work?) Tj ET
+BT /F1 8.5 Tf 0.15 0.18 0.22 rg 57 457 Td (ANSWER: Trips begin with 100.0% safety score. Minor infractions \(overspeeding\) deduct 1.5%, while critical events \(harsh braking\) deduct 2.5%.) Tj ET
+BT /F1 8.5 Tf 0.15 0.18 0.22 rg 57 444.5 Td (At delivery completion, calculateTripPoints\(\) awards base points proportional to safety tier \(Gold Tier >= 95% gets 100 pts\),) Tj ET
+BT /F1 8.5 Tf 0.15 0.18 0.22 rg 57 432 Td (+20 clean ride bonus if zero infractions occurred, and +2 pts per km completed. Drivers redeem points for fuel vouchers or instant UPI cash.) Tj ET
+0.96 0.97 1 rg 45 357 522 61.5 re f
+0.2 0.4 0.7 RG 1 w 45 357 522 61.5 re S
+0.2 0.4 0.7 rg 45 357 4 61.5 re f
+BT /F2 9.5 Tf 0.2 0.4 0.7 rg 57 403.5 Td (Q5: What was the benefit of using Docker in your project architecture?) Tj ET
+BT /F1 8.5 Tf 0.15 0.18 0.22 rg 57 389.5 Td (ANSWER: Docker allowed us to containerize our Python backend, PostgreSQL database, and Redis cache into isolated microservices with) Tj ET
+BT /F1 8.5 Tf 0.15 0.18 0.22 rg 57 377 Td (a single docker-compose.yml file. It eliminated 'works on my machine' dependency issues, ensured identical database schemas and) Tj ET
+BT /F1 8.5 Tf 0.15 0.18 0.22 rg 57 364.5 Td (Python environments, and simplified deployment with isolated networking and persistent volume mounts.) Tj ET
+BT /F2 10.5 Tf 0.12 0.35 0.55 rg 45 333 Td (Summary Checklist for Your Interview:) Tj ET
+0.1 0.4 0.7 rg 49 321.5 3.5 3.5 re f
+BT /F2 9 Tf 0.1 0.15 0.25 rg 59 319 Td (Core Tech: ESP32 C++, MPU-6050, BLE GATT, Flutter \(Dart\), Python \(FastAPI\), React 18,) Tj ET
+BT /F1 9 Tf 0.2 0.22 0.28 rg 59 306.5 Td (PostgreSQL, Docker.) Tj ET
+0.1 0.4 0.7 rg 49 295.5 3.5 3.5 re f
+BT /F2 9 Tf 0.1 0.15 0.25 rg 59 293 Td (Key Numbers to Quote: 20 Hz telemetry stream, +/-16g sensor scale, <50ms latency,) Tj ET
+BT /F1 9 Tf 0.2 0.22 0.28 rg 59 280.5 Td (100-point safety scale, 10 pts = 1 INR conversion.) Tj ET
+0.1 0.4 0.7 rg 49 269.5 3.5 3.5 re f
+BT /F2 9 Tf 0.1 0.15 0.25 rg 59 267 Td (Engineering Highlights: Dual-sensor fusion, chassis decoupling, vertical-dominant) Tj ET
+BT /F1 9 Tf 0.2 0.22 0.28 rg 59 254.5 Td (pothole detection, Delta-V crash forensics.) Tj ET
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 6 0 R /Resources << /Font << /F1 1 0 R /F2 2 0 R /F3 3 0 R >> >> >>
+endobj
+xref
+0 10
+0000000000 65535 f 
+0000000023 00000 n 
+0000000072 00000 n 
+0000000137 00000 n 
+0000000234 00000 n 
+0000000336 00000 n 
+0000000431 00000 n 
+0000007443 00000 n 
+0000007589 00000 n 
+0000013437 00000 n 
+trailer
+<< /Size 10 /Root 1 0 R >>
+startxref
+13583
+%%EOF

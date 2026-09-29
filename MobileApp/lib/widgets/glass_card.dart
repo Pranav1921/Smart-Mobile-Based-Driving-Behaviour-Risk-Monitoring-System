@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../core/constants/app_colors.dart';
 
@@ -9,7 +8,7 @@ class GlassCard extends StatelessWidget {
   final Color? color;
   final Color? borderColor;
   final Color? shadowColor;
-  final BorderSide? borderSide; // Retained for backward compatibility
+  final BorderSide? borderSide;
   final double? width;
   final double? height;
   final VoidCallback? onTap;
@@ -18,7 +17,7 @@ class GlassCard extends StatelessWidget {
     super.key,
     required this.child,
     this.padding,
-    this.borderRadius = 16.0,
+    this.borderRadius = 24.0,
     this.color,
     this.borderColor,
     this.shadowColor,
@@ -30,56 +29,47 @@ class GlassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cardColor = color ?? AppColors.surface.withOpacity(0.55);
-    final strokeColor = borderColor ?? Colors.white.withOpacity(0.08);
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final cardColor = color ?? (isLight ? AppColors.surface : const Color(0xFF1E293B));
+    final strokeColor = borderColor ?? (isLight ? AppColors.border : const Color(0xFF334155));
     final strokeWidth = borderSide?.width ?? 1.0;
-    final activeShadowColor = shadowColor ?? Colors.black.withOpacity(0.25);
+    final activeShadowColor = shadowColor ?? (isLight ? const Color(0xFFE5DFD3).withOpacity(0.7) : Colors.black.withOpacity(0.2));
 
     Widget cardContent = Container(
       width: width,
       height: height,
+      padding: padding ?? const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.transparent,
+        color: cardColor,
         borderRadius: BorderRadius.circular(borderRadius),
+        border: Border.all(
+          color: strokeColor,
+          width: strokeWidth,
+        ),
         boxShadow: [
           BoxShadow(
             color: activeShadowColor,
-            offset: const Offset(0, 10),
-            blurRadius: 30,
-            spreadRadius: -5,
+            offset: const Offset(0, 4),
+            blurRadius: 14,
+            spreadRadius: 0,
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(borderRadius),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16.0, sigmaY: 16.0),
-          child: Container(
-            decoration: BoxDecoration(
-              color: cardColor,
-              borderRadius: BorderRadius.circular(borderRadius),
-              border: Border.all(
-                color: strokeColor,
-                width: strokeWidth,
-              ),
-            ),
-            child: Padding(
-              padding: padding ?? const EdgeInsets.all(18.0),
-              child: child,
-            ),
-          ),
-        ),
-      ),
+      child: child,
     );
 
     if (onTap != null) {
-      return GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: cardContent,
+      return Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(borderRadius),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(borderRadius),
+          child: cardContent,
+        ),
       );
     }
-    
+
     return cardContent;
   }
 }

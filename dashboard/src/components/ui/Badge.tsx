@@ -12,6 +12,8 @@ const TONES: Record<string, string> = {
   low: 'text-sky-300 bg-sky-400/10 border-sky-400/25',
   idle: 'text-sky-300 bg-sky-400/10 border-sky-400/25',
   offline: 'text-slate-400 bg-slate-400/10 border-slate-400/20',
+  leave: 'text-amber-400 bg-amber-400/15 border-amber-400/30',
+  on_leave: 'text-amber-400 bg-amber-400/15 border-amber-400/30',
   cyan: 'text-cyan-300 bg-cyan-400/10 border-cyan-400/25',
   info: 'text-cyan-300 bg-cyan-400/10 border-cyan-400/25',
   positive: 'text-emerald-300 bg-emerald-400/10 border-emerald-400/25',

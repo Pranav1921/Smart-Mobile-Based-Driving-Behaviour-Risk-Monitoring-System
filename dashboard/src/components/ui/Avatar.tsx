@@ -10,17 +10,30 @@ const GRADIENTS = [
 ]
 
 function initials(name: string) {
+  if (!name) return 'AG'
   return name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
 }
 
-export function Avatar({ name, size = 40, className }: { name: string; size?: number; className?: string }) {
-  const g = GRADIENTS[name.charCodeAt(0) % GRADIENTS.length]
+export function Avatar({ name, src, size = 40, className }: { name: string; src?: string; size?: number; className?: string }) {
+  if (src && (src.startsWith('data:image') || src.startsWith('http') || src.startsWith('blob:'))) {
+    return (
+      <img
+        src={src}
+        alt={name || 'Driver'}
+        className={cn('rounded-full object-cover shrink-0 shadow-md', className)}
+        style={{ width: size, height: size }}
+      />
+    )
+  }
+
+  const safeName = name || 'Driver'
+  const g = GRADIENTS[safeName.charCodeAt(0) % GRADIENTS.length]
   return (
     <div
       className={cn('grid place-items-center rounded-full font-semibold text-white shrink-0 shadow-lg', className)}
       style={{ width: size, height: size, background: g, fontSize: size * 0.36 }}
     >
-      {initials(name)}
+      {initials(safeName)}
     </div>
   )
 }
