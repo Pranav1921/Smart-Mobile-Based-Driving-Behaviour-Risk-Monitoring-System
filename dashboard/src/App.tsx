@@ -13,7 +13,7 @@ import CrashInvestigation from '@/pages/CrashInvestigation.tsx'
 import Reports from '@/pages/Reports.tsx'
 import PublicLiveTrack from '@/pages/PublicLiveTrack.tsx'
 import { SocketProvider, useSocket } from '@/hooks/SocketContext.tsx'
-import { TriangleAlert as AlertTriangle, UserCheck, CheckCircle2, XCircle, Wrench, Truck, PhoneCall } from 'lucide-react'
+import { TriangleAlert as AlertTriangle, UserCheck, CheckCircle2, XCircle, Wrench, Truck, PhoneCall, MapPin, Video } from 'lucide-react'
 
 import { DriverDetailModal } from '@/components/drivers/DriverDetailModal'
 import type { Driver } from '@/types'
@@ -40,6 +40,8 @@ function AppContent() {
     emitIncidentResolved,
     breakdownAlert,
     setBreakdownAlert,
+    emitLiveCamRequest,
+    liveFrame,
   } = useSocket()
   const [dismissedIncidentId, setDismissedIncidentId] = useState<string | null>(null)
   const [selectedProtocolDriver, setSelectedProtocolDriver] = useState<Driver | null>(null)
