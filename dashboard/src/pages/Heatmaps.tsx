@@ -12,8 +12,9 @@ import { useSocket } from '@/hooks/SocketContext'
 
 const LAYERS = [
   { key: 'potholes',  label: 'Potholes & Bad Roads', icon: Activity,      color: '#f43f5e', glow: 'rgba(244,63,94,0.5)' },
+  { key: 'hotspots',  label: 'Risk Hotspots (Multi-Driver)', icon: Flame, color: '#f97316', glow: 'rgba(249,115,22,0.5)' },
   { key: 'crash',     label: 'Crash Events',        icon: ShieldAlert,   color: '#ef4444', glow: 'rgba(239,68,68,0.5)' },
-  { key: 'overspeed', label: 'Overspeed',            icon: Gauge,         color: '#f97316', glow: 'rgba(249,115,22,0.5)' },
+  { key: 'overspeed', label: 'Overspeed',            icon: Gauge,         color: '#fb923c', glow: 'rgba(251,146,60,0.5)' },
   { key: 'braking',   label: 'Harsh Braking',       icon: TrendingDown,  color: '#eab308', glow: 'rgba(234,179,8,0.5)'  },
   { key: 'turn',      label: 'Sharp Turn',          icon: CornerUpRight,  color: '#a855f7', glow: 'rgba(168,85,247,0.5)' },
 ] as const
@@ -37,6 +38,7 @@ const INTENSITY_COLOR: Record<string, string> = {
 
 const EVENT_NAMES: Record<LayerKey, string[]> = {
   potholes:  ['Heavy Road Vibration', 'Pothole Impact Zone', 'Severe Surface Degradation', 'Rough Transit Segment'],
+  hotspots:  ['Hazardous Intersection (3+ Drivers)', 'Blind Curve Braking Hotspot', 'High-Risk Merge Node', 'Slippery Incline Hazard'],
   crash:     ['Collision Detected', 'Hard Impact Event', 'Rear-End Alert', 'Side Impact'],
   overspeed: ['Speed Limit Breach', 'Excessive Speed', 'Speed Zone Violation', 'Rapid Acceleration'],
   braking:   ['Sudden Brake', 'Panic Braking', 'ABS Engagement', 'Emergency Stop'],
@@ -147,10 +149,17 @@ export default function Heatmaps() {
       <GlassCard padded={false} className="overflow-hidden rounded-3xl">
         <div className="h-[580px] relative">
           <MapContainer center={activeRegion.center} zoom={13} className="h-full w-full" zoomControl={false}>
-            {/* Dark base for max contrast */}
             <TileLayer
-              url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-              attribution="&copy; CARTO"
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+              attribution="&copy; Esri &mdash; Esri, DeLorme, NAVTEQ"
+              maxZoom={19}
+              maxNativeZoom={16}
+            />
+            <TileLayer
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}"
+              attribution=""
+              maxZoom={19}
+              maxNativeZoom={16}
             />
 
             {/* TRUE CANVAS HEATMAP — smooth Gaussian blobs, no circles */}

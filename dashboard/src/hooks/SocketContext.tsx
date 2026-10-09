@@ -57,6 +57,17 @@ export interface SocketContextType {
   newRequestToast: { id: string; name: string; zone: string; time: string; count: number } | null;
   dismissNewRequestToast: () => void;
   refreshPendingDrivers: (zone?: string) => Promise<void>;
+  // Driver Safe Confirmation Announcement
+  driverSafeToast: { driverName: string; time: string; reason?: string } | null;
+  dismissDriverSafeToast: () => void;
+  // Cross Delivery & Driver Admin Controls
+  toggleDriverAvailability: (driverId: string, isAvailable: boolean) => void;
+  toggleDriverDeadZone: (driverId: string, isDeadZone: boolean) => void;
+  initiateCrossDelivery: (driverId: string, orderDetails?: any) => void;
+  crossDeliveryOffer: any | null;
+  crossDeliveryToast: { title: string; message: string; type: 'available' | 'confirmed' } | null;
+  dismissCrossDeliveryToast: () => void;
+  sameDirectionSummary: { count: number; pairs: any[] } | null;
 }
 
 const defaultContext: SocketContextType = {
@@ -94,6 +105,15 @@ const defaultContext: SocketContextType = {
   newRequestToast: null,
   dismissNewRequestToast: () => {},
   refreshPendingDrivers: async () => {},
+  driverSafeToast: null,
+  dismissDriverSafeToast: () => {},
+  toggleDriverAvailability: () => {},
+  toggleDriverDeadZone: () => {},
+  initiateCrossDelivery: () => {},
+  crossDeliveryOffer: null,
+  crossDeliveryToast: null,
+  dismissCrossDeliveryToast: () => {},
+  sameDirectionSummary: null,
 };
 
 const SocketContext = createContext<SocketContextType | undefined>(undefined);

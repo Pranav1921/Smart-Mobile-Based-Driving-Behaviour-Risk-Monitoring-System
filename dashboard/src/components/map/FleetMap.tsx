@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useState } from 'react'
+import { useMemo, useEffect, useState, Fragment } from 'react'
 import { MapContainer, TileLayer, Marker, Polyline, Polygon, useMap, Circle, Tooltip } from 'react-leaflet'
 import L from 'leaflet'
 import type { Driver, LivePothole } from '@/types'
@@ -9,6 +9,7 @@ import { useOverpassSchools } from '@/hooks/useOverpassSchools'
 import { HeatmapLayer } from '@/components/map/HeatmapLayer'
 import { geocodeLocationExternal, searchLocationsExternal, type GeocodedLocation } from '@/services/geocodingService'
 import { Search, MapPin, X, Navigation2, Check, Loader2, Sparkles, Send } from 'lucide-react'
+import { isDriverInRegion } from '@/lib/regionMatcher'
 
 const STATUS_COLOR: Record<string, string> = {
   safe: '#10b981', warning: '#f59e0b', emergency: '#ef4444', idle: '#3b82f6', offline: '#94a3b8',
@@ -77,7 +78,40 @@ function LocateControl() {
 }
 
 // Map Tile Layers Configuration
-export const MAP_PROVIDERS: Record<string, { name: string; url: string; attribution: string; maxZoom: number }> = {
+export interface MapProviderConfig {
+  name: string
+  url: string
+  referenceUrl?: string
+  attribution: string
+  maxZoom: number
+  maxNativeZoom?: number
+  className?: string
+}
+
+export const MAP_PROVIDERS: Record<string, MapProviderConfig> = {
+  'tactical-dark': {
+    name: 'Tactical Dark',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+    referenceUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
+    attribution: '&copy; Esri &mdash; Esri, DeLorme, NAVTEQ',
+    maxZoom: 19,
+    maxNativeZoom: 16,
+  },
+  'cartodb-dark': {
+    name: 'Tactical Dark',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+    referenceUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
+    attribution: '&copy; Esri &mdash; Esri, DeLorme, NAVTEQ',
+    maxZoom: 19,
+    maxNativeZoom: 16,
+  },
+  'cyber-dark': {
+    name: 'Cyberpunk Dark (OSM)',
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 19,
+    className: 'tactical-dark-tile',
+  },
   'google-satellite': {
     name: 'Satellite View',
     url: 'https://mt1.google.com/vt/lyrs=y,traffic&x={x}&y={y}&z={z}',
@@ -90,48 +124,181 @@ export const MAP_PROVIDERS: Record<string, { name: string; url: string; attribut
     attribution: '&copy; OpenStreetMap',
     maxZoom: 19,
   },
-  'cartodb-dark': {
-    name: 'Tactical Dark',
-    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; CartoDB',
-    maxZoom: 19,
-  },
+}
+
+export type Vehicle3DType = 'scooter' | 'bike' | 'auto' | 'truck' | 'car'
+
+function getVehicleIconDetails(driver: Driver): { path: string; width: number; height: number; type: Vehicle3DType } {
+  const text = `${driver.appliedVehicle || ''} ${(driver as any).vehicleType || ''} ${(driver as any).vehicleName || ''} ${(driver as any).vehicleModel || ''} ${driver.vehicleId || ''}`.toLowerCase()
+  
+  // 1. Scooter / Scooty (Activa, Jupiter, Access, Dio, Moped, EV scooter, etc.)
+  if (
+    text.includes('scoot') || 
+    text.includes('activa') || 
+    text.includes('jupiter') || 
+    text.includes('access') || 
+    text.includes('dio') || 
+    text.includes('moped') || 
+    text.includes('ather') || 
+    text.includes('ola') || 
+    text.includes('chetak') || 
+    text.includes('pleasure') || 
+    text.includes('pep') || 
+    text.includes('burgman') || 
+    text.includes('ntorq') || 
+    text.includes('grazio') || 
+    text.includes('ray')
+  ) {
+    return { path: '/markers/vehicle_scooter.png', width: 30, height: 68, type: 'scooter' }
+  }
+
+  // 2. Auto Rickshaw (Three-wheeler / Tuk-Tuk)
+  if (
+    text.includes('auto') || 
+    text.includes('rickshaw') || 
+    text.includes('3-wheel') || 
+    text.includes('three-wheel') || 
+    text.includes('tuk') || 
+    text.includes('ape')
+  ) {
+    return { path: '/markers/vehicle_auto.png', width: 38, height: 66, type: 'auto' }
+  }
+
+  // 3. Motorcycle / Bike
+  if (
+    text.includes('bike') || 
+    text.includes('motorcycle') || 
+    text.includes('pulsar') || 
+    text.includes('splendor') || 
+    text.includes('bullet') || 
+    text.includes('royal enfield') || 
+    text.includes('apache') || 
+    text.includes('ktm') || 
+    text.includes('fz') || 
+    text.includes('shine') || 
+    text.includes('platina') || 
+    text.includes('2-wheel') || 
+    text.includes('two-wheel')
+  ) {
+    return { path: '/markers/vehicle_bike.png', width: 32, height: 68, type: 'bike' }
+  }
+
+  // 4. Heavy Commercial Vehicle / Truck / LCV
+  if (
+    text.includes('truck') || 
+    text.includes('ace') || 
+    text.includes('lcv') || 
+    text.includes('van') || 
+    text.includes('cargo') || 
+    text.includes('pickup') || 
+    text.includes('bolero') || 
+    text.includes('lorry') || 
+    text.includes('eicher') || 
+    text.includes('dost')
+  ) {
+    return { path: '/markers/vehicle_truck.png', width: 46, height: 92, type: 'truck' }
+  }
+
+  // 5. Default: Car / Cab / Taxi
+  return { path: '/markers/vehicle_car.png', width: 38, height: 78, type: 'car' }
+}
+
+function getTacticalCode(driver: Driver, type: Vehicle3DType): string {
+  const prefix = type === 'truck' ? 'T' : type === 'scooter' ? 'S' : type === 'auto' ? 'A' : type === 'bike' ? 'B' : 'C'
+  const digits = (driver.vehicleId || driver.id || '').replace(/[^0-9]/g, '')
+  if (digits.length >= 3) {
+    return `${prefix}-${digits.slice(-3)}`
+  }
+  // Deterministic 3-digit number from driver name/id for uniform presentation
+  const sum = (driver.name || driver.id || '100').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
+  const num = (sum % 900) + 100
+  return `${prefix}-${num}`
 }
 
 function markerIcon(driver: Driver, active: boolean) {
   const isDeadZone = (driver as any).isDeadZone === true
+  const isEmergency = driver.status === 'emergency'
   const isOffline = driver.status === 'offline' && !isDeadZone
-  const color = isDeadZone ? '#06b6d4' : isOffline ? '#64748b' : (STATUS_COLOR[driver.status] || STATUS_COLOR.safe)
-  const pulse = driver.status === 'emergency' || isDeadZone
-  const size = active ? 48 : 38
-  const initial = driver.name ? driver.name.trim().charAt(0).toUpperCase() : 'D'
+  const color = isDeadZone ? '#06b6d4' : isEmergency ? '#ef4444' : isOffline ? '#64748b' : (STATUS_COLOR[driver.status] || STATUS_COLOR.safe)
+  const pulse = isEmergency || isDeadZone
+  const heading = typeof driver.heading === 'number' ? driver.heading : 0
+  const vehicle = getVehicleIconDetails(driver)
+  const tacticalCode = getTacticalCode(driver, vehicle.type)
+  const cleanName = (driver.name || 'Driver').replace(/\s+applicant/gi, '').split(' ')[0]
+  
+  const vWidth = active ? Math.round(vehicle.width * 1.18) : vehicle.width
+  const vHeight = active ? Math.round(vehicle.height * 1.18) : vehicle.height
+  const boxW = Math.max(vWidth + 36, 96)
+  const boxH = vHeight + 48
+
   return L.divIcon({
-    className: 'fleet-marker',
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
+    className: 'custom-fleet-vehicle-marker',
+    iconSize: [boxW, boxH],
+    iconAnchor: [boxW / 2, boxH / 2],
     html: `
-      <div style="position:relative;width:${size}px;height:${size}px;display:flex;justify-content:center;align-items:center;">
-        ${pulse ? `<div style="position:absolute;width:${size + 20}px;height:${size + 20}px;border-radius:50%;background:${color};opacity:0.35;animation:pulse 1.2s infinite;"></div>` : ''}
-        ${isDeadZone ? `<div style="position:absolute;top:-6px;right:-6px;padding:1px 4px;border-radius:6px;background:#0891b2;border:1.5px solid #fff;color:#fff;font-size:7.5px;font-weight:900;box-shadow:0 2px 6px rgba(0,0,0,0.6);" title="Dead Zone / Local Buffer Active">📡 DEAD ZONE</div>` : ''}
-        ${isOffline && !isDeadZone ? `<div style="position:absolute;top:-4px;right:-4px;width:14px;height:14px;border-radius:50%;background:#f59e0b;border:2px solid #0f172a;display:flex;align-items:center;justify-content:center;font-size:8px;box-shadow:0 2px 5px rgba(0,0,0,0.5);" title="No Network Zone">📡</div>` : ''}
+      <div style="position:relative;width:${boxW}px;height:${boxH}px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;">
+        ${pulse ? `<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:${vWidth + 24}px;height:${vHeight + 24}px;border-radius:28px;background:${color};opacity:0.35;animation:pulse 1.2s infinite;pointer-events:none;"></div>` : ''}
+
+        <!-- 3D Tactical Callout Tag Badge (e.g. T-102, C-215, B-309) -->
         <div style="
-          width:${size}px;
-          height:${size}px;
-          border-radius:50%;
-          background:${color};
-          border:${isDeadZone ? '3px dashed #38bdf8' : isOffline ? '3px dashed #cbd5e1' : '4px solid #ffffff'};
-          opacity:${isOffline ? 0.88 : 1};
-          box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+          position:absolute;
+          top:0;
+          display:flex;
+          align-items:center;
+          gap:4px;
+          background:rgba(10, 15, 29, 0.96);
+          border:1.5px solid ${isDeadZone ? '#06b6d4' : isEmergency ? '#ef4444' : '#22c55e'};
+          box-shadow: 0 4px 14px rgba(0,0,0,0.85), 0 0 10px ${isDeadZone ? 'rgba(6,182,212,0.45)' : isEmergency ? 'rgba(239,68,68,0.45)' : 'rgba(34,197,94,0.35)'};
+          border-radius:6px;
+          padding:2px 7px;
+          z-index:20;
+          pointer-events:none;
+        ">
+          <span style="width:5px;height:5px;border-radius:50%;background:${color};box-shadow:0 0 6px ${color};"></span>
+          <span style="font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:11px; font-weight:900; color:#ffffff; letter-spacing:0.5px;">
+            ${tacticalCode}
+          </span>
+          ${isDeadZone ? `<span style="padding:1px 4px;border-radius:4px;background:#0891b2;color:#fff;font-size:7.5px;font-weight:900;letter-spacing:0.4px;">DEAD ZONE</span>` : ''}
+          ${isEmergency ? `<span style="padding:1px 4px;border-radius:4px;background:#dc2626;color:#fff;font-size:7.5px;font-weight:900;animation:pulse 0.8s infinite;">SOS</span>` : ''}
+        </div>
+
+        <!-- 3D Realistic Vehicle Body with Rotation & Depth Shadow -->
+        <div style="
+          position:relative;
+          width:${vWidth}px;
+          height:${vHeight}px;
           display:flex;
           align-items:center;
           justify-content:center;
-          color:#ffffff;
-          font-weight:900;
-          font-family: Inter, system-ui, sans-serif;
-          font-size:${active ? 20 : 16}px;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          transform:rotate(${heading}deg);
+          transition:transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+          filter: drop-shadow(0 12px 22px rgba(0,0,0,0.9)) drop-shadow(0 3px 6px rgba(0,0,0,0.95)) ${isDeadZone ? 'drop-shadow(0 0 12px #06b6d4)' : ''};
         ">
-          ${initial}
+          <img 
+            src="${vehicle.path}" 
+            alt="${vehicle.type}" 
+            style="width:100%;height:100%;object-fit:contain;pointer-events:none;display:block;" 
+          />
+        </div>
+
+        <!-- Driver Name Pill -->
+        <div style="
+          position:absolute;
+          bottom:0;
+          background:rgba(15, 23, 42, 0.95);
+          border:1px solid ${color};
+          border-radius:9999px;
+          padding:1px 7px;
+          display:flex;
+          align-items:center;
+          gap:3px;
+          box-shadow:0 3px 8px rgba(0,0,0,0.6);
+          pointer-events:none;
+        ">
+          <span style="width:4px;height:4px;border-radius:50%;background:${color};"></span>
+          <span style="font-size:8.5px;font-weight:800;color:#ffffff;white-space:nowrap;max-width:75px;overflow:hidden;text-overflow:ellipsis;">
+            ${cleanName}
+          </span>
         </div>
       </div>`,
   })
@@ -139,25 +306,27 @@ function markerIcon(driver: Driver, active: boolean) {
 
 function FitRegionBounds({
   activeRegion,
-  targetDriver,
+  selectedDriver,
   isFullMap,
 }: {
   activeRegion?: RegionOption | null
-  targetDriver?: Driver | null
+  selectedDriver?: Driver | null
   isFullMap: boolean
 }) {
   const map = useMap()
 
+  // Only smooth-pan to driver if the admin EXPLICITLY clicked on a specific driver
   useEffect(() => {
-    if (!map) return
-
-    // If there is an active live driver with valid GPS, center directly on the live driver!
-    if (targetDriver && targetDriver.location && typeof targetDriver.location.lat === 'number' && typeof targetDriver.location.lng === 'number' && targetDriver.location.lat !== 0 && targetDriver.location.lng !== 0) {
-      map.flyTo([targetDriver.location.lat, targetDriver.location.lng], 16, { duration: 1.5 })
-      return
+    if (!map || !selectedDriver?.location) return
+    const { lat, lng } = selectedDriver.location
+    if (typeof lat === 'number' && typeof lng === 'number' && lat !== 0 && lng !== 0) {
+      map.panTo([lat, lng], { animate: true, duration: 1.0 })
     }
+  }, [selectedDriver?.id, map])
 
-    if (!activeRegion) return
+  // Center/fit region when active region changes - NEVER force high zoom on live updates!
+  useEffect(() => {
+    if (!map || !activeRegion) return
 
     try {
       if (isFullMap) {
@@ -167,16 +336,16 @@ function FitRegionBounds({
         if (activeRegion.boundaryPolygon && activeRegion.boundaryPolygon.length >= 3) {
           const bounds = L.latLngBounds(activeRegion.boundaryPolygon as [number, number][])
           if (bounds.isValid()) {
-            map.fitBounds(bounds, { padding: [80, 80], maxZoom: 15, animate: true, duration: 1.5 })
+            map.fitBounds(bounds, { padding: [80, 80], maxZoom: 14, animate: true, duration: 1.5 })
           }
         } else {
-          map.flyTo(activeRegion.center, 14, { duration: 1.5 })
+          map.flyTo(activeRegion.center, 13, { duration: 1.5 })
         }
       }
     } catch (err) {
       map.flyTo(activeRegion.center, 13)
     }
-  }, [activeRegion?.id, activeRegion?.center?.[0], activeRegion?.center?.[1], targetDriver?.id, targetDriver?.location?.lat, targetDriver?.location?.lng, isFullMap, map])
+  }, [activeRegion?.id, activeRegion?.center?.[0], activeRegion?.center?.[1], isFullMap, map])
 
   return null
 }
@@ -204,15 +373,6 @@ function FollowLiveDriverControl({ targetDriver }: { targetDriver?: Driver | nul
   )
 }
 
-function generateRoadPath(start: {lat: number, lng: number}, end: {lat: number, lng: number}): [number, number][] {
-  const p1: [number, number] = [start.lat, start.lng];
-  const p2: [number, number] = [start.lat + 0.002, start.lng + 0.001];
-  const p3: [number, number] = [start.lat + 0.004, start.lng - 0.002];
-  const p4: [number, number] = [(start.lat + end.lat) / 2, (start.lng + end.lng) / 2 + 0.003];
-  const p5: [number, number] = [end.lat - 0.003, end.lng + 0.002];
-  const p6: [number, number] = [end.lat, end.lng];
-  return [p1, p2, p3, p4, p5, p6];
-}
 
 function externalPinIcon(loc: GeocodedLocation) {
   const shortName = (loc.displayName.split(',')[0] || 'Target').substring(0, 16)
@@ -253,6 +413,32 @@ function externalPinIcon(loc: GeocodedLocation) {
   })
 }
 
+function MapLegendControl() {
+  return (
+    <div style={{ position: 'absolute', bottom: '24px', left: '20px', zIndex: 1000, pointerEvents: 'auto' }}>
+      <div className="bg-slate-950/92 backdrop-blur-md border border-white/10 rounded-xl px-3.5 py-2.5 shadow-2xl">
+        <div className="text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2">Fleet Radar Legend</div>
+        <div className="flex flex-col gap-1.5 text-[11px] font-bold">
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded bg-emerald-500/25 border-2 border-emerald-400 flex items-center justify-center">
+              <span className="w-1 h-1 rounded-full bg-white"></span>
+            </span>
+            <span className="text-slate-200">Active Corridor Line</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded bg-cyan-500/25 border-2 border-cyan-400"></span>
+            <span className="text-cyan-300">Cyan Deadzones (Ghat)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded bg-rose-500/25 border-2 border-rose-500"></span>
+            <span className="text-rose-300">High-Risk / No-Go Zones</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function FleetMap({
   drivers, 
   selectedId, 
@@ -262,9 +448,13 @@ export function FleetMap({
   showPotholes = false,
   geofences = [],
   onDeleteGeofence,
-  mapMode = 'google-satellite',
+  mapMode = 'tactical-dark',
   activeRegion,
-  isFullMap = false
+  isFullMap = false,
+  relayTroubledDriver = null,
+  relayCandidateDriver = null,
+  isRelayMode = false,
+  onSelectRelayCandidate,
 }: {
   drivers: Driver[]
   selectedId: string | null
@@ -277,6 +467,10 @@ export function FleetMap({
   mapMode?: string
   activeRegion?: RegionOption | null
   isFullMap?: boolean
+  relayTroubledDriver?: Driver | null
+  relayCandidateDriver?: Driver | null
+  isRelayMode?: boolean
+  onSelectRelayCandidate?: (driverId: string) => void
 }) {
   const { schools: osmSchools } = useOverpassSchools(activeRegion ?? null)
 
@@ -302,32 +496,38 @@ export function FleetMap({
   const fallbackLat = (activeRegion?.center && !isNaN(activeRegion.center[0]) && activeRegion.center[0] !== 0) ? activeRegion.center[0] : 12.7749
   const fallbackLng = (activeRegion?.center && !isNaN(activeRegion.center[1]) && activeRegion.center[1] !== 0) ? activeRegion.center[1] : 75.2023
 
-  // Filter strictly by active region (preserve last known location for offline/no-network drivers)
-  const regionActiveDrivers = drivers.filter(d => {
-    if (!d) return false
-    if (!activeRegion || !activeRegion.id || activeRegion.id === 'all' || activeRegion.id === 'default') return true
-    const regId = (d.regionId || d.region || d.zone || '').toLowerCase().replace(/[^a-z0-9]/g, '')
-    const activeRegId = (activeRegion.id || activeRegion.name || '').toLowerCase().replace(/[^a-z0-9]/g, '')
-    return regId === activeRegId || regId.includes(activeRegId) || activeRegId.includes(regId)
-  })
+  // Filter by active region with fallback to all drivers if region filter produces 0
+  const regionActiveDrivers = useMemo(() => {
+    if (!drivers || drivers.length === 0) return []
+    if (!activeRegion || !activeRegion.id || activeRegion.id === 'all' || activeRegion.id === 'default') {
+      return drivers
+    }
+    const filtered = drivers.filter(d => {
+      if (!d) return false
+      if ((d as any).isDeadZone === true || d.status === 'emergency' || d.status !== 'offline') return true
+      return isDriverInRegion(d, activeRegion.id)
+    })
+    return filtered.length > 0 ? filtered : drivers
+  }, [drivers, activeRegion])
 
-  // Only display drivers that are genuinely online and streaming real GPS coordinates
-  const validDrivers = regionActiveDrivers.filter((d) => {
-    if (!d || !d.location) return false
-    const lat = d.location.lat
-    const lng = d.location.lng
-    if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) {
-      return false
-    }
-    // Filter out synthetic fallback coordinates if driver is offline or has no real telemetry
-    const isDefaultFallback = Math.abs(lat - 12.7749) < 0.0001 && Math.abs(lng - 75.2023) < 0.0001
-    if (isDefaultFallback && (d.status === 'offline' || !d.speed || d.speed === 0)) {
-      return false
-    }
-    const isDeadZone = (d as any).isDeadZone === true
-    const isEmergency = d.status === 'emergency'
-    return d.status !== 'offline' || isDeadZone || isEmergency
-  })
+  // Display all drivers with valid GPS coordinates (stationary, moving, or emergency)
+  const validDrivers = useMemo(() => {
+    return regionActiveDrivers.filter((d) => {
+      if (!d || !d.location) return false
+      const lat = d.location.lat
+      const lng = d.location.lng
+      if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) {
+        return false
+      }
+      if (lat === 0 && lng === 0) {
+        return false
+      }
+      if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        return false
+      }
+      return true
+    })
+  }, [regionActiveDrivers])
 
   useEffect(() => {
     validDrivers.forEach(d => {
@@ -341,27 +541,36 @@ export function FleetMap({
     })
   }, [validDrivers, activeRegion?.state, activeRegion?.country, resolvedDestMap])
   
-  // Find a valid target driver with actual lat/lng
-  const targetDriver = validDrivers.find(d => d.id === selectedId) || validDrivers.find(d => d.status !== 'offline') || validDrivers[0]
+  // Only track target driver when explicitly selected by admin
+  const selectedDriver = selectedId ? validDrivers.find(d => d.id === selectedId) : null
+  const firstActiveDriver = validDrivers.find(d => d.status !== 'offline') || validDrivers[0]
   
-  // Prioritize actual live driver position if present
-  const initialCenter: [number, number] = (targetDriver && targetDriver.location && !isNaN(targetDriver.location.lat) && !isNaN(targetDriver.location.lng) && targetDriver.location.lat !== 0)
-    ? [targetDriver.location.lat, targetDriver.location.lng]
-    : (geocodedSectorCenter || (activeRegion?.center && Array.isArray(activeRegion.center) && activeRegion.center.length === 2 && !isNaN(activeRegion.center[0]) ? activeRegion.center : [12.7749, 75.2023]))
+  const initialCenter: [number, number] = geocodedSectorCenter || (activeRegion?.center && Array.isArray(activeRegion.center) && activeRegion.center.length === 2 && !isNaN(activeRegion.center[0]) ? activeRegion.center : (firstActiveDriver?.location ? [firstActiveDriver.location.lat, firstActiveDriver.location.lng] : [12.7749, 75.2023]))
 
-  const activeProvider = MAP_PROVIDERS[mapMode] || MAP_PROVIDERS['google-satellite']
+  const activeProvider = MAP_PROVIDERS[mapMode] || MAP_PROVIDERS['tactical-dark'] || MAP_PROVIDERS['google-satellite']
   const sectorCenter = geocodedSectorCenter || activeRegion?.center
 
   return (
-    <MapContainer center={initialCenter} zoom={targetDriver ? 16 : (activeRegion?.zoom || 14)} zoomControl={false} className="h-full w-full" preferCanvas>
+    <MapContainer center={initialCenter} zoom={activeRegion?.zoom || 13} zoomControl={false} className="h-full w-full" preferCanvas>
       <TileLayer
         key={mapMode}
         url={activeProvider.url}
         attribution={activeProvider.attribution}
         maxZoom={activeProvider.maxZoom}
+        maxNativeZoom={activeProvider.maxNativeZoom}
+        className={activeProvider.className}
       />
+      {activeProvider.referenceUrl && (
+        <TileLayer
+          key={`${mapMode}-ref`}
+          url={activeProvider.referenceUrl}
+          attribution=""
+          maxZoom={activeProvider.maxZoom}
+          maxNativeZoom={activeProvider.maxNativeZoom}
+        />
+      )}
 
-      <FitRegionBounds activeRegion={activeRegion} targetDriver={targetDriver} isFullMap={isFullMap} />
+      <FitRegionBounds activeRegion={activeRegion} selectedDriver={selectedDriver} isFullMap={isFullMap} />
       <LocateControl />
 
       {/* External Geocoded Locations Marked on the Map */}
@@ -426,14 +635,7 @@ export function FleetMap({
             lineCap: 'round',
             lineJoin: 'round',
           }}
-        >
-          <Tooltip direction="top" className="bg-slate-950/95 border border-emerald-500/50 text-emerald-300 font-extrabold text-[10px] uppercase tracking-wider px-3 py-1.5 rounded-xl shadow-2xl backdrop-blur-md">
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>{activeRegion.name} · Jurisdiction Boundary</span>
-            </div>
-          </Tooltip>
-        </Polygon>
+        />
       )}
 
       {/* Pothole & Rough Road Heatmap Overlay */}
@@ -461,29 +663,39 @@ export function FleetMap({
       ))}
 
       {/* Dynamic Speed Restriction Geofences */}
-      {geofences.map((geo) => (
-        <Circle
-          key={geo.id}
-          center={[geo.centerLat, geo.centerLng]}
-          radius={geo.radiusMeters}
-          pathOptions={{
-            color: geo.color || '#38bdf8',
-            fillColor: geo.color || '#38bdf8',
-            fillOpacity: 0.16,
-            weight: 2.5,
-            dashArray: '6 6',
-          }}
-        >
-          <Tooltip direction="top" offset={[0, -10]} className="bg-slate-950/95 border border-white/20 text-white rounded-xl shadow-2xl p-2.5 min-w-[200px]">
-            <div className="flex items-center justify-between gap-2 pb-1 border-b border-slate-800">
-              <span className="text-xs font-black uppercase text-white truncate">{geo.name}</span>
-              <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                {geo.speedLimitKph} KM/H MAX
-              </span>
-            </div>
-            <div className="text-[10px] text-slate-400 mt-1 font-mono">
-              Radius: {geo.radiusMeters}m · Lat: {geo.centerLat.toFixed(4)}, Lng: {geo.centerLng.toFixed(4)}
-            </div>
+      {geofences.map((geo) => {
+        const isDeadZoneType = geo.type === 'deadzone';
+        return (
+          <Circle
+            key={geo.id}
+            center={[geo.centerLat, geo.centerLng]}
+            radius={geo.radiusMeters}
+            pathOptions={{
+              color: isDeadZoneType ? '#06b6d4' : (geo.color || '#38bdf8'),
+              fillColor: isDeadZoneType ? '#0891b2' : (geo.color || '#38bdf8'),
+              fillOpacity: isDeadZoneType ? 0.28 : 0.16,
+              weight: isDeadZoneType ? 3.5 : 2.5,
+              dashArray: isDeadZoneType ? '4 8' : '6 6',
+            }}
+          >
+            <Tooltip direction="top" offset={[0, -10]} className="bg-slate-950/95 border border-white/20 text-white rounded-xl shadow-2xl p-2.5 min-w-[210px]">
+              <div className="flex items-center justify-between gap-2 pb-1 border-b border-slate-800">
+                <span className="text-xs font-black uppercase text-white truncate">
+                  {isDeadZoneType ? `📡 ${geo.name}` : geo.name}
+                </span>
+                {isDeadZoneType ? (
+                  <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                    📡 DEAD ZONE (GHAT)
+                  </span>
+                ) : (
+                  <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                    {geo.speedLimitKph} KM/H MAX
+                  </span>
+                )}
+              </div>
+              <div className="text-[10px] text-slate-400 mt-1 font-mono">
+                Radius: {geo.radiusMeters}m · Lat: {geo.centerLat.toFixed(4)}, Lng: {geo.centerLng.toFixed(4)}
+              </div>
             {onDeleteGeofence && (
               <div className="mt-2 pt-1 border-t border-slate-800 text-right">
                 <button
@@ -500,56 +712,79 @@ export function FleetMap({
             )}
           </Tooltip>
         </Circle>
-      ))}
+      );
+    })}
 
-      {selectedId && (() => {
-        const d = validDrivers.find((drv) => drv.id === selectedId)
-        if (!d || !d.location) return null
-        const start = d.location
-        const end = (d.destLat != null && d.destLng != null && !isNaN(d.destLat) && !isNaN(d.destLng)) 
-          ? { lat: d.destLat, lng: d.destLng } 
-          : (d.deliveryTo && resolvedDestMap[d.deliveryTo] ? resolvedDestMap[d.deliveryTo] : null)
-        if (!end) return null
-        const path = generateRoadPath(start, end);
+      {/* 70/30 PARTNERSHIP RELAY TACTICAL CORRIDOR (Only when relay mode is active) */}
+      {isRelayMode && relayTroubledDriver?.location && relayCandidateDriver?.location && (() => {
+        const start = relayTroubledDriver.location;
+        const end = relayCandidateDriver.location;
+        const midLat = (start.lat + end.lat) / 2;
+        const midLng = (start.lng + end.lng) / 2;
+        const dLat = (end.lat - start.lat) * 111;
+        const dLng = (end.lng - start.lng) * 111 * Math.cos(midLat * Math.PI / 180);
+        const distKm = Math.round(Math.sqrt(dLat * dLat + dLng * dLng) * 10) / 10;
+        const etaMin = Math.max(2, Math.round((distKm / 35) * 60));
+
         return (
           <>
             <Polyline
-              positions={path}
+              positions={[[start.lat, start.lng], [end.lat, end.lng]]}
               pathOptions={{
-                color: '#10b981',
-                weight: 6,
-                opacity: 0.9,
+                color: '#06b6d4',
+                weight: 5,
+                opacity: 0.95,
                 lineCap: 'round',
                 lineJoin: 'round',
-                dashArray: '1 12',
+                dashArray: '6 10',
               }}
             />
-            <Circle center={[start.lat, start.lng]} radius={15} pathOptions={{ color: '#10b981', fillColor: '#fff', fillOpacity: 1, weight: 4 }} />
-            <Circle center={[end.lat, end.lng]} radius={20} pathOptions={{ color: '#f43f5e', fillColor: '#fff', fillOpacity: 1, weight: 5 }} >
-               <Tooltip permanent direction="top" offset={[0, -15]} className="bg-slate-900 border-none text-white font-black text-[9px] uppercase tracking-widest px-3 py-1.5 rounded-lg shadow-2xl">
-                 Target: {d.deliveryTo || 'Sector B'} · {end.lat.toFixed(4)}, {end.lng.toFixed(4)}
-               </Tooltip>
+            <Circle center={[start.lat, start.lng]} radius={40} pathOptions={{ color: '#f43f5e', fillColor: '#f43f5e', fillOpacity: 0.35, weight: 3 }} />
+            <Circle center={[end.lat, end.lng]} radius={40} pathOptions={{ color: '#06b6d4', fillColor: '#06b6d4', fillOpacity: 0.35, weight: 3 }} />
+            <Circle center={[midLat, midLng]} radius={12} pathOptions={{ color: '#06b6d4', fillColor: '#0891b2', fillOpacity: 0.9, weight: 2 }}>
+              <Tooltip permanent direction="top" offset={[0, -12]} className="bg-slate-950 border border-cyan-400 text-white font-mono text-[9px] font-bold px-2 py-1 rounded-lg shadow-2xl">
+                🤝 70/30 RELAY CORRIDOR · {distKm} km · ~{etaMin}m ETA
+              </Tooltip>
             </Circle>
           </>
-        )
+        );
       })()}
 
       {validDrivers.map((d) => {
         const isDeadZone = (d as any).isDeadZone === true
         const isOffline = d.status === 'offline' && !isDeadZone
         const cleanName = (d.name || 'Driver').replace(/\s+applicant/gi, '').trim()
+        const isRelaySelected = isRelayMode && relayCandidateDriver?.id === d.id
+        const isRelayTroubled = isRelayMode && relayTroubledDriver?.id === d.id
+
         return (
           <Marker 
             key={d.id} 
             position={[d.location.lat, d.location.lng]} 
-            icon={markerIcon(d, selectedId === d.id)}
-            eventHandlers={{ click: () => onSelect(d.id) }} 
-            zIndexOffset={isDeadZone ? 500 : 0}
+            icon={markerIcon(d, selectedId === d.id || isRelaySelected || isRelayTroubled)}
+            eventHandlers={{ 
+              click: () => {
+                if (isRelayMode && onSelectRelayCandidate) {
+                  onSelectRelayCandidate(d.id)
+                } else {
+                  onSelect(d.id)
+                }
+              } 
+            }} 
+            zIndexOffset={isDeadZone ? 500 : (isRelaySelected || isRelayTroubled ? 600 : 0)}
           >
             <Tooltip direction="top" offset={[0, -22]} className="bg-slate-950/95 border border-slate-700 text-white rounded-xl shadow-2xl p-2.5 font-sans min-w-[190px]">
               <div className="flex items-center justify-between gap-2 pb-1 border-b border-slate-800">
                 <span className="text-xs font-black text-white">{cleanName}</span>
-                {isDeadZone ? (
+                {isRelayTroubled ? (
+                  <span className="text-[8px] font-black uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/40 px-1.5 py-0.5 rounded">
+                    📦 30% TROUBLED ORIGIN
+                  </span>
+                ) : isRelaySelected ? (
+                  <span className="text-[8px] font-black uppercase tracking-wider bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 px-1.5 py-0.5 rounded">
+                    🚀 70% RELAY CANDIDATE
+                  </span>
+                ) : isDeadZone ? (
                   <span className="text-[8px] font-black uppercase tracking-wider bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 px-1.5 py-0.5 rounded">
                     📡 DEAD ZONE (GHAT)
                   </span>
@@ -579,6 +814,7 @@ export function FleetMap({
           </Marker>
         )
       })}
+      <MapLegendControl />
     </MapContainer>
   )
 }

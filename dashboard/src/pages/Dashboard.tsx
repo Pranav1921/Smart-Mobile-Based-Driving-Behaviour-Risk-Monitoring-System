@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   MapPin, RefreshCcw, ShieldAlert, AlertTriangle, Zap,
-  Activity, Radio, Gauge, Compass, ShieldCheck, Leaf, Coffee, Volume2
+  Activity, Radio, ShieldCheck, Leaf, Coffee, Volume2
 } from 'lucide-react'
 import { VoiceBroadcastModal } from '@/components/broadcast/VoiceBroadcastModal'
 import { fetchEventsFromApi } from '@/lib/apiClient'
@@ -79,13 +79,13 @@ export default function Dashboard() {
 
   const activeRegionObj = useMemo(() => resolveActiveRegion(), [activeRegionName])
 
-  // Strictly isolate drivers to only the admin's active region
+  // Isolate drivers to admin's active region, but ALWAYS include active live, deadzone, or emergency drivers
   const regionalDrivers = useMemo(() => {
-    const filtered = liveDrivers.filter(d => isDriverInRegion(d, activeRegionObj.id))
-    if (filtered.length === 0 && liveDrivers.some(d => d.status !== 'offline')) {
-      return liveDrivers.filter(d => d.status !== 'offline' || isDriverInRegion(d, activeRegionObj.id))
-    }
-    return filtered
+    return liveDrivers.filter(d => {
+      if (!d || d.id === 'agent-x' || d.id === 'mobile-driver') return false;
+      if (d.status === 'emergency' || (d as any).isDeadZone === true || d.status !== 'offline') return true;
+      return isDriverInRegion(d, activeRegionObj.id);
+    });
   }, [liveDrivers, activeRegionObj.id])
 
   const onlineDrivers = useMemo(() => {
@@ -105,9 +105,6 @@ export default function Dashboard() {
 
   const totalDistance = onlineDrivers.reduce((acc, d) => acc + (d.distanceToday || 0), 0)
   const totalMissions = onlineDrivers.reduce((acc, d) => acc + (d.trips || 0), 0)
-  const avgVibration = onlineCount
-    ? (onlineDrivers.reduce((acc, d) => acc + (d.vibrationRate || 0), 0) / onlineCount).toFixed(2)
-    : '0.00'
 
   const fleetEcoScore = onlineCount
     ? Math.round(
@@ -198,8 +195,8 @@ export default function Dashboard() {
         </div>
       </motion.div>
 
-      {/* ── 8-PIECE MECHANICAL TELEMETRY INSTRUMENT CLUSTER ─────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3.5">
+      {/* ── 6-PIECE MECHANICAL TELEMETRY INSTRUMENT CLUSTER ─────────────────── */}
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3.5">
         <CockpitStatCard
           label="Active Nodes"
           value={onlineCount}
@@ -240,22 +237,6 @@ export default function Dashboard() {
           sub="Mission Log"
           icon={<Activity size={16} />}
           tone="blue"
-        />
-        <CockpitStatCard
-          label="Cumulative"
-          value={totalDistance.toFixed(1)}
-          unit="KM"
-          sub="Distance Today"
-          icon={<Compass size={16} />}
-          tone="blue"
-        />
-        <CockpitStatCard
-          label="Inertial G"
-          value={avgVibration}
-          unit="G-AVG"
-          sub="Dynamic Jitter"
-          icon={<Gauge size={16} />}
-          tone="amber"
         />
         <CockpitStatCard
           label="Alerts"

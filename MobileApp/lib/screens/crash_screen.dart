@@ -30,29 +30,40 @@ class CrashScreen extends StatelessWidget {
         : (profile.familyWhatsappNumber.isNotEmpty ? profile.familyWhatsappNumber : '');
     final kinRel = profile.familyRelationship.isNotEmpty ? profile.familyRelationship : 'Parent';
 
+    final bool isCrash = tripProv.isCrashDetected;
+    final bool isPing = tripProv.isAdminPinging;
+
     return Scaffold(
       backgroundColor: HardwarePalette.obsidianChassis,
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(56),
-        child: Container(
-          decoration: BoxDecoration(
-            color: HardwarePalette.charcoalSurface,
-            border: const Border(bottom: BorderSide(color: HardwarePalette.criticalRed, width: 1.0)),
-          ),
-          alignment: Alignment.bottomCenter,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              MechanicalPressable(
-                onTap: () {
-                  SoundEffectService.playRelayLatch();
-                  tripProv.confirmSafe();
-                  Navigator.pushReplacementNamed(context, AppRoutes.home);
-                },
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        backgroundColor: HardwarePalette.charcoalSurface,
+        elevation: 0,
+        titleSpacing: 14,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(color: HardwarePalette.criticalRed.withOpacity(0.6), height: 1),
+        ),
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            MechanicalPressable(
+              onTap: () {
+                SoundEffectService.playRelayLatch();
+                tripProv.confirmSafe();
+                Navigator.pushReplacementNamed(context, AppRoutes.home);
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: HardwarePalette.debossedChassis,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: HardwarePalette.criticalRed.withOpacity(0.4)),
+                ),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.arrow_back_ios_new_rounded, color: HardwarePalette.criticalRed, size: 14),
+                    const Icon(Icons.arrow_back_ios_new_rounded, color: HardwarePalette.criticalRed, size: 12),
                     const SizedBox(width: 4),
                     Text(
                       "RETURN DECK",
@@ -61,12 +72,26 @@ class CrashScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              Text(
-                "CRITICAL EMERGENCY CHANNEL",
-                style: HardwareTypography.ndotHeader(fontSize: 11, color: HardwarePalette.criticalRed),
-              ),
-            ],
-          ),
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: HardwarePalette.criticalRed,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  isCrash ? "CRITICAL CRASH CHANNEL" : (isPing ? "HQ VERIFICATION CHANNEL" : "EMERGENCY SOS BEACON"),
+                  style: HardwareTypography.ndotHeader(fontSize: 11, color: HardwarePalette.criticalRed),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
       body: SafeArea(
@@ -80,45 +105,56 @@ class CrashScreen extends StatelessWidget {
               decoration: HardwareDeco.stampedCard(
                 backgroundColor: HardwarePalette.charcoalSurface,
                 borderColor: HardwarePalette.criticalRed,
-                radius: 2,
+                radius: 4,
               ),
               child: Column(
                 children: [
                   Container(
-                    width: 44,
-                    height: 44,
+                    width: 48,
+                    height: 48,
                     decoration: HardwareDeco.stampedCard(
                       backgroundColor: HardwarePalette.debossedChassis,
                       borderColor: HardwarePalette.criticalRed,
-                      radius: 2,
+                      radius: 4,
                     ),
-                    child: const Icon(Icons.emergency_rounded, color: HardwarePalette.criticalRed, size: 24),
+                    child: Icon(
+                      isCrash 
+                        ? Icons.car_crash_rounded 
+                        : (isPing ? Icons.verified_user_rounded : Icons.sos_rounded),
+                      color: HardwarePalette.criticalRed,
+                      size: 26,
+                    ),
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    "COLLISION / IMPACT DETECTED",
+                    isCrash 
+                      ? "COLLISION / IMPACT DETECTED" 
+                      : (isPing ? "HQ SAFETY VERIFICATION CHECK" : "EMERGENCY SOS PANIC BEACON ACTIVE"),
+                    textAlign: TextAlign.center,
                     style: HardwareTypography.ndotHeader(
                       fontSize: 13,
                       color: HardwarePalette.criticalRed,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   Text(
-                    tripProv.crashReason.toUpperCase(),
+                    tripProv.crashReason.isNotEmpty 
+                      ? tripProv.crashReason.toUpperCase() 
+                      : "MANUAL SOS PANIC BROADCAST TRANSMITTED TO FLEET HQ",
                     textAlign: TextAlign.center,
                     style: HardwareTypography.jetBrainsBody(
                       fontSize: 11,
-                      color: HardwarePalette.pureWhite,
+                      color: HardwarePalette.isDark ? HardwarePalette.pureWhite : HardwarePalette.silkscreenDark,
                     ),
                   ),
                   if (tripProv.sosCountdown > 0) ...[
                     const SizedBox(height: 10),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                       decoration: HardwareDeco.stampedCard(
                         backgroundColor: HardwarePalette.debossedChassis,
                         borderColor: HardwarePalette.criticalRed,
-                        radius: 2,
+                        radius: 4,
                       ),
                       child: Text(
                         "AUTO ESCALATING IN ${tripProv.sosCountdown}S",
@@ -134,7 +170,7 @@ class CrashScreen extends StatelessWidget {
             ),
             const SizedBox(height: 14),
 
-            // Primary Safety Confirmation Button
+            // Primary Safety Confirmation Button (High-Visibility Emerald Green)
             MechanicalPressable(
               onTap: () {
                 SoundEffectService.playSuccess();
@@ -142,22 +178,34 @@ class CrashScreen extends StatelessWidget {
                 Navigator.pushReplacementNamed(context, AppRoutes.home);
               },
               child: Container(
-                height: 48,
-                decoration: HardwareDeco.stampedCard(
-                  backgroundColor: HardwarePalette.neonActiveGreen,
-                  radius: 2,
+                height: 52,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF10B981), Color(0xFF059669)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFF34D399), width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF10B981).withOpacity(0.4),
+                      blurRadius: 14,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
                 alignment: Alignment.center,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.check_circle_rounded, color: Colors.black, size: 18),
+                    const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
                     const SizedBox(width: 8),
                     Text(
                       "I AM SAFE — CANCEL ALERT",
                       style: HardwareTypography.jetBrainsButton(
-                        fontSize: 11,
-                        color: Colors.black,
+                        fontSize: 12,
+                        color: Colors.white,
                       ),
                     ),
                   ],
@@ -166,26 +214,33 @@ class CrashScreen extends StatelessWidget {
             ),
             const SizedBox(height: 10),
 
-            // Immediate Escalation Button
+            // Immediate Escalation Button (High-Hazard Red Outline)
             MechanicalPressable(
               onTap: () {
                 SoundEffectService.playAlertTone();
                 tripProv.escalateEmergency();
               },
               child: Container(
-                height: 46,
+                height: 48,
                 decoration: HardwareDeco.stampedCard(
                   backgroundColor: HardwarePalette.charcoalSurface,
                   borderColor: HardwarePalette.criticalRed,
-                  radius: 2,
+                  radius: 6,
                 ),
                 alignment: Alignment.center,
-                child: Text(
-                  "TRIGGER IMMEDIATE SOS ESCALATION",
-                  style: HardwareTypography.jetBrainsButton(
-                    fontSize: 10.5,
-                    color: HardwarePalette.criticalRed,
-                  ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.warning_amber_rounded, color: HardwarePalette.criticalRed, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      "TRIGGER IMMEDIATE SOS ESCALATION",
+                      style: HardwareTypography.jetBrainsButton(
+                        fontSize: 11,
+                        color: HardwarePalette.criticalRed,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -260,7 +315,10 @@ class CrashScreen extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     kinName.toUpperCase(),
-                    style: HardwareTypography.jetBrainsButton(fontSize: 12, color: HardwarePalette.pureWhite),
+                    style: HardwareTypography.jetBrainsButton(
+                      fontSize: 12, 
+                      color: HardwarePalette.isDark ? HardwarePalette.pureWhite : HardwarePalette.silkscreenDark,
+                    ),
                   ),
                   Text(
                     kinPhone.isNotEmpty ? kinPhone : "NO NUMBER REGISTERED",
@@ -368,7 +426,13 @@ class CrashScreen extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label, style: HardwareTypography.jetBrainsLabel(fontSize: 9.5)),
-        Text(value, style: HardwareTypography.ndotNumber(fontSize: 12, color: HardwarePalette.pureWhite)),
+        Text(
+          value, 
+          style: HardwareTypography.ndotNumber(
+            fontSize: 12, 
+            color: HardwarePalette.isDark ? HardwarePalette.pureWhite : HardwarePalette.silkscreenDark,
+          ),
+        ),
       ],
     );
   }
@@ -392,7 +456,10 @@ class CrashScreen extends StatelessWidget {
             Text(
               title,
               textAlign: TextAlign.center,
-              style: HardwareTypography.jetBrainsLabel(fontSize: 8.5, color: HardwarePalette.pureWhite),
+              style: HardwareTypography.jetBrainsLabel(
+                fontSize: 8.5, 
+                color: HardwarePalette.isDark ? HardwarePalette.pureWhite : HardwarePalette.silkscreenDark,
+              ),
             ),
           ],
         ),

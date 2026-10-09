@@ -51,25 +51,62 @@ class ScoreService:
                     elif acceleration > 3.0:
                         rapid_accel_count += 1
 
-        # Calculate safety score
-        safety_score = 100
-        safety_score -= harsh_braking_count * 3
-        safety_score -= rapid_accel_count * 2
-        safety_score -= overspeed_count * 4
-        safety_score -= sharp_turn_count * 3
-        safety_score -= phone_usage_count * 8
-        safety_score -= crash_count * 50
-        safety_score = max(0.0, min(100.0, float(safety_score)))
+        # Compute estimated trip distance in kilometers from GPS points
+        distance_km = 0.0
+        if len(points) > 1:
+            for i in range(1, len(points)):
+                p1, p2 = points[i - 1], points[i]
+                lat1, lon1 = float(p1.get("latitude", 0)), float(p1.get("longitude", 0))
+                lat2, lon2 = float(p2.get("latitude", 0)), float(p2.get("longitude", 0))
+                if lat1 != 0 and lat2 != 0:
+                    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+                    dphi = math.radians(lat2 - lat1)
+                    dlambda = math.radians(lon2 - lon1)
+                    a = math.sin(dphi/2)**2 + math.cos(phi1)*math.cos(phi2)*math.sin(dlambda/2)**2
+                    a = min(1.0, max(0.0, a))
+                    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
+                    distance_km += (6371.0 * c)
 
-        # Calculate risk score
-        risk_score = 0
-        risk_score += harsh_braking_count * 4
-        risk_score += rapid_accel_count * 3
-        risk_score += overspeed_count * 5
-        risk_score += sharp_turn_count * 4
-        risk_score += phone_usage_count * 12
-        risk_score += crash_count * 80
-        risk_score = max(0.0, min(100.0, float(risk_score)))
+        eff_distance = max(1.0, distance_km)
+
+        # Distance-Normalized Penalty Model: events per 100 km
+        # lambda_i = (count / distance_km) * 100
+        lambda_brake = (harsh_braking_count / eff_distance) * 100.0
+        lambda_accel = (rapid_accel_count / eff_distance) * 100.0
+        lambda_speed = (overspeed_count / eff_distance) * 100.0
+        lambda_turn  = (sharp_turn_count / eff_distance) * 100.0
+        lambda_phone = (phone_usage_count / eff_distance) * 100.0
+
+        # Sub-Penalties with Exponential Tolerance Decay
+        # P_i = 100 * (1 - exp(-lambda_i / beta_i))
+        pen_brake = 100.0 * (1.0 - math.exp(-lambda_brake / 6.0))
+        pen_accel = 100.0 * (1.0 - math.exp(-lambda_accel / 8.0))
+        pen_speed = 100.0 * (1.0 - math.exp(-lambda_speed / 5.0))
+        pen_turn  = 100.0 * (1.0 - math.exp(-lambda_turn / 7.0))
+        pen_phone = 100.0 * (1.0 - math.exp(-lambda_phone / 3.0))
+
+        # Weighted Overall Safety Score (Braking 0.25, Speed 0.25, Turn 0.20, Accel 0.15, Focus 0.15)
+        total_penalty = (
+            0.25 * pen_brake +
+            0.25 * pen_speed +
+            0.20 * pen_turn +
+            0.15 * pen_accel +
+            0.15 * pen_phone
+        )
+        if crash_count > 0:
+            total_penalty = max(total_penalty, 80.0)
+
+        safety_score = round(max(0.0, min(100.0, 100.0 - total_penalty)), 1)
+        risk_score = round(100.0 - safety_score, 1)
+
+        # Sub-Scores (0-100)
+        sub_scores = {
+            "braking": round(max(0.0, 100.0 - pen_brake), 1),
+            "acceleration": round(max(0.0, 100.0 - pen_accel), 1),
+            "speed": round(max(0.0, 100.0 - pen_speed), 1),
+            "cornering": round(max(0.0, 100.0 - pen_turn), 1),
+            "focus": round(max(0.0, 100.0 - pen_phone), 1),
+        }
 
         # Driver classification
         classification = "BALANCED"
@@ -78,21 +115,21 @@ class ScoreService:
         elif safety_score < 60 or risk_score > 50:
             classification = "AGGRESSIVE"
 
-        # Generate recommendations
+        # Generate explainable recommendations
         recommendations = []
-        if harsh_braking_count > 2:
-            recommendations.append("Maintain a larger following distance to avoid sudden stop decelerations.")
-        if rapid_accel_count > 2:
-            recommendations.append("Accelerate progressively to save vehicle fuel and decrease engine wear.")
-        if overspeed_count > 2:
-            recommendations.append("Respect road speed limits to lower risk profiles and reduce accident probability.")
-        if sharp_turn_count > 2:
-            recommendations.append("Reduce speed before entering turns to prevent high lateral G-forces.")
+        if harsh_braking_count > 0:
+            recommendations.append(f"{harsh_braking_count} harsh braking events ({round(lambda_brake, 1)} / 100km). Increase following distance.")
+        if rapid_accel_count > 0:
+            recommendations.append(f"{rapid_accel_count} rapid acceleration events. Smooth throttle inputs to improve fuel economy.")
+        if overspeed_count > 0:
+            recommendations.append(f"{overspeed_count} overspeed incidents. Observe roadway speed caps.")
+        if sharp_turn_count > 0:
+            recommendations.append(f"{sharp_turn_count} sharp cornering events. Decelerate smoothly prior to curve entry.")
         if phone_usage_count > 0:
-            recommendations.append("Avoid handling mobile devices during movement. Keep your focus on the road.")
+            recommendations.append(f"{phone_usage_count} mobile handling distractions recorded. Keep device mounted.")
         
         if not recommendations:
-            recommendations.append("Excellent driving performance! Continue following safe travel rules.")
+            recommendations.append("Flawless trip with zero safety infractions. Excellent driving adherence!")
 
         # Calculate XP reward
         xp_earned = int(100 + (safety_score * 1.5))
@@ -109,6 +146,14 @@ class ScoreService:
         return {
             "safetyScore": safety_score,
             "riskScore": risk_score,
+            "subScores": sub_scores,
+            "distanceKm": round(distance_km, 2),
+            "eventsPer100Km": {
+                "braking": round(lambda_brake, 1),
+                "acceleration": round(lambda_accel, 1),
+                "speed": round(lambda_speed, 1),
+                "cornering": round(lambda_turn, 1),
+            },
             "behaviorClassification": classification,
             "recommendations": recommendations,
             "xpEarned": xp_earned,

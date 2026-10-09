@@ -118,7 +118,7 @@ class _BurnInProtectedHUDState extends State<BurnInProtectedHUD> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.arrow_back_ios_new_rounded,
                             color: HardwarePalette.chassisLabelMid,
                             size: 11,

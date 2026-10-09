@@ -9,6 +9,7 @@ import '../core/theme/framer_motion.dart';
 import '../models/transaction_model.dart';
 import '../providers/trip_provider.dart';
 import '../services/haptic_service.dart';
+import '../services/upi_service.dart';
 
 class UpiPaymentModal extends StatefulWidget {
   final String payeeName;
@@ -76,6 +77,46 @@ class _UpiPaymentModalState extends State<UpiPaymentModal> {
     _noteController.dispose();
     _confettiController.dispose();
     super.dispose();
+  }
+
+  Future<void> _launchDirectExternalUpi() async {
+    final double? amt = double.tryParse(_amountController.text.trim());
+    if (amt == null || amt <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter a valid amount"), backgroundColor: Colors.redAccent),
+      );
+      return;
+    }
+    HapticService.selectionClick();
+
+    final note = _noteController.text.trim().isNotEmpty ? _noteController.text.trim() : "Direct UPI Transfer";
+    final success = await UpiService.launchDirectUpiPayment(
+      upiId: widget.payeeUpiId,
+      payeeName: widget.payeeName,
+      amount: amt,
+      note: note,
+      context: context,
+    );
+
+    if (success) {
+      final tripProv = Provider.of<TripProvider>(context, listen: false);
+      final txn = await tripProv.makeUpiPayment(
+        title: widget.payeeName,
+        subtitle: "Direct External UPI to ${widget.payeeUpiId}",
+        amount: amt,
+        category: _selectedCategory,
+        upiId: widget.payeeUpiId,
+        notes: note,
+        paymentMethod: "External UPI App (GPay/PhonePe/Paytm)",
+      );
+      _confettiController.play();
+      if (mounted) {
+        setState(() {
+          _completedTxn = txn;
+          _currentStep = 3;
+        });
+      }
+    }
   }
 
   void _onProceedToPin() {
@@ -394,14 +435,14 @@ class _UpiPaymentModalState extends State<UpiPaymentModal> {
 
         const SizedBox(height: 20),
 
-        // Proceed Button
+        // Primary: Launch External UPI App (100% Free Bank-to-Bank)
         SizedBox(
           width: double.infinity,
           height: 52,
           child: ElevatedButton(
-            onPressed: _onProceedToPin,
+            onPressed: _launchDirectExternalUpi,
             style: ElevatedButton.styleFrom(
-              backgroundColor: HardwarePalette.signalEmerald,
+              backgroundColor: const Color(0xFF0284C7),
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               elevation: 0,
@@ -409,9 +450,35 @@ class _UpiPaymentModalState extends State<UpiPaymentModal> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text("PROCEED TO PAY", style: GoogleFonts.spaceGrotesk(fontSize: 14, fontWeight: FontWeight.w900)),
+                const Icon(Icons.flash_on_rounded, size: 20, color: Colors.amber),
                 const SizedBox(width: 8),
-                const Icon(Icons.arrow_forward_rounded, size: 18),
+                Text("PAY VIA UPI APP (FREE 0% FEE)", style: GoogleFonts.spaceGrotesk(fontSize: 13, fontWeight: FontWeight.w900)),
+                const SizedBox(width: 6),
+                const Icon(Icons.open_in_new_rounded, size: 16),
+              ],
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 10),
+
+        // Secondary: In-App Fast Sandbox PIN Keypad
+        SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: OutlinedButton(
+            onPressed: _onProceedToPin,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: HardwarePalette.signalEmerald,
+              side: const BorderSide(color: HardwarePalette.signalEmerald, width: 1.5),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.pin_rounded, size: 18),
+                const SizedBox(width: 8),
+                Text("ENTER IN-APP PIN (SANDBOX)", style: GoogleFonts.spaceGrotesk(fontSize: 12.5, fontWeight: FontWeight.w800)),
               ],
             ),
           ),

@@ -1,0 +1,69 @@
+\chapter{Introduction}
+\label{chap:intro}
+
+\section{Introduction to Project}
+\label{sec:intro_project}
+In recent years, the rapid growth of mobile technology and intelligent data processing has significantly transformed the transportation and automotive industry. Road safety has become a major concern due to the increasing number of accidents caused by unsafe driving behaviors such as overspeeding, harsh braking, sudden acceleration, and distracted driving. Traditional monitoring systems rely heavily on manual supervision or expensive hardware installations, which are not scalable or cost-effective for large-scale deployment. As a result, there is a growing need for an efficient, low-cost, and intelligent system that can continuously monitor driver behavior and provide meaningful insights to improve road safety.
+
+The project titled \textbf{``Smart Mobile-Based Driving Behaviour \& Risk Monitoring System''} aims to address these challenges by leveraging smartphone-based sensing and modern data analytics techniques. The system utilizes built-in sensors available in smartphones, such as accelerometer, gyroscope, and GPS, to collect real-time driving data without the need for additional hardware devices. This approach significantly reduces system cost while maintaining high accessibility and usability.
+
+The proposed system is designed to analyze driving patterns and identify unsafe behaviors using intelligent data processing techniques. Events such as harsh braking, rapid acceleration, sharp turns, and speed violations are detected based on sensor data patterns. The collected data is transmitted to a cloud-based backend, where it is processed and stored for further analysis. A web-based dashboard is developed to visualize the data in the form of driver scores, trip summaries, event logs, and geographical insights, enabling fleet managers and users to monitor performance effectively.
+
+Unlike traditional IoT-based systems that require dedicated hardware components, this project follows a mobile computing and cloud-integrated architecture. It combines the advantages of mobile computing, wireless communication, and machine learning to provide a scalable and efficient solution. The system not only improves driver safety but also contributes to better fleet management, reduced accident rates, and enhanced decision-making capabilities.
+
+Overall, this project demonstrates how modern smartphone technology can be effectively utilized to build an intelligent, real-time, and cost-efficient driver monitoring system, making it highly suitable for real-world applications.
+
+\section{Introduction to Technology used}
+\label{sec:tech_used}
+The development of the proposed system involves the integration of multiple modern technologies that work together to enable real-time data collection, intelligent analysis, and effective visualization. These technologies are carefully selected to ensure system efficiency, scalability, and ease of use.
+
+\subsection{Mobile Sensing Technology}
+\begin{itemize}
+    \item \textbf{Accelerometer:} The smartphone accelerometer is used to measure linear acceleration along the X, Y, and Z axes. In this project, it helps in detecting basic driving behaviors such as sudden acceleration, braking, and movement state. However, its accuracy depends on the phone's placement, which may introduce noise.
+    \item \textbf{Gyroscope:} The mobile gyroscope measures angular velocity and is used to detect turning movements and orientation changes. It assists in identifying driving patterns such as cornering and slight directional shifts, but may not always provide consistent results due to varying device positioning.
+    \item \textbf{GPS Sensor:} The GPS sensor provides real-time location data such as speed, latitude, longitude, and travel route. It is used for trip tracking, route visualization, and detecting speed violations. This data is also displayed on the dashboard for analysis.
+    \item \textbf{Sensor Fusion (Mobile Processing):} The smartphone combines multiple sensor inputs to derive useful information such as motion detection, speed estimation, and driving state. This helps in basic-level behavior monitoring without requiring additional hardware.
+\end{itemize}
+
+\subsection{External Sensing Technology}
+\begin{itemize}
+    \item \textbf{IMU Sensor:} The system uses an external Inertial Measurement Unit (IMU) connected to the ESP32 microcontroller. This IMU internally combines both acceleration and angular motion sensing, providing synchronized and more accurate motion data. It is used to detect critical driving events such as harsh braking, sudden acceleration, and sharp turns with higher precision compared to smartphone sensors.
+    \item \textbf{ESP32 Microcontroller:} The ESP32 acts as the core processing unit of the external device. It collects data from the IMU sensor, processes it, and transmits it to the mobile application. The ESP32 is chosen due to its low power consumption, built-in wireless capabilities, and efficient performance.
+\end{itemize}
+
+\subsection{Communication Technology}
+\begin{itemize}
+    \item \textbf{Bluetooth Low Energy (BLE):} Bluetooth Low Energy (BLE) is used for communication between the ESP32 device and the mobile application. BLE ensures low power consumption and real-time data transmission, making it suitable for continuous monitoring of driving behavior.
+\end{itemize}
+
+\subsection{Software Technology}
+The system is developed using modern software technologies that ensure performance, scalability, and efficient communication between mobile, hardware device, and dashboard systems:
+\begin{itemize}
+    \item \textbf{Flutter:} Flutter is used to develop the cross-platform mobile application with a responsive and user-friendly interface for real-time driver monitoring.
+    \item \textbf{React (Vite):} React with Vite is used to build a fast and interactive web dashboard for visualizing driver behavior, trips, and analytics.
+    \item \textbf{Node.js:} Node.js is used as the backend runtime environment to handle server-side logic and process incoming data efficiently.
+    \item \textbf{Express.js:} Express.js is used to create RESTful APIs that manage communication between the mobile app, ESP32 device, and dashboard.
+    \item \textbf{PostgreSQL:} PostgreSQL is used as the primary database for storing structured data such as driver details, trips, and event logs.
+    \item \textbf{REST APIs:} REST APIs are used to enable seamless communication between frontend, backend, and database components.
+    \item \textbf{BLE Communication Integration:} BLE APIs are used in the mobile application to receive real-time sensor data from the ESP32 device.
+\end{itemize}
+
+\subsection{Machine Learning}
+The system incorporates machine learning techniques to analyze driving patterns and detect risky behaviors:
+\begin{itemize}
+    \item \textbf{Classification Algorithms:} Used to classify driving events such as safe or risky driving behavior.
+    \item \textbf{Threshold-Based Detection:} Used for identifying events like harsh braking and over-speeding based on predefined limits.
+    \item \textbf{Time-Series Analysis:} Used to analyze continuous sensor data collected over time.
+    \item \textbf{Scikit-learn:} Used for implementing machine learning models and data analysis.
+    \item \textbf{NumPy \& Pandas:} Used for data processing, cleaning, and manipulation.
+\end{itemize}
+
+\subsection{Dashboard and User Interface Technologies}
+The dashboard is designed to provide clear visualization and insights into driver behavior:
+\begin{itemize}
+    \item \textbf{Frontend: HTML, CSS, JavaScript:} For responsive UI.
+    \item \textbf{React.js:} Used for building dynamic and component-based UI.
+    \item \textbf{Chart Libraries (Chart.js):} Used for visualizing data such as driver scores and trip analytics.
+    \item \textbf{OpenStreetMap API:} Used for displaying routes, trip tracking, and location-based insights.
+    \item \textbf{Responsive UI Design:} Ensures accessibility across devices such as desktops, tablets, and mobiles.
+\end{itemize}

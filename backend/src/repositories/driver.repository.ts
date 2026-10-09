@@ -3,8 +3,13 @@ import { Prisma, VehicleAssignment, DriverScore } from '@prisma/client';
 
 export class DriverRepository {
   async findById(id: string) {
-    return prisma.driver.findUnique({
-      where: { id },
+    return prisma.driver.findFirst({
+      where: {
+        OR: [
+          { id },
+          { userId: id },
+        ],
+      },
       include: {
         user: true,
         vehicleAssignments: {
@@ -18,7 +23,13 @@ export class DriverRepository {
   async findByUserId(userId: string) {
     return prisma.driver.findUnique({
       where: { userId },
-      include: { user: true },
+      include: {
+        user: true,
+        vehicleAssignments: {
+          where: { unassignedAt: null },
+          include: { vehicle: true },
+        },
+      },
     });
   }
 
@@ -116,11 +127,31 @@ export class DriverRepository {
   }
 
   async delete(id: string) {
-    // Unassign active vehicle assignments
-    await prisma.vehicleAssignment.deleteMany({ where: { driverId: id } });
-    // Remove scores and assignments
-    await prisma.driverScore.deleteMany({ where: { driverId: id } });
-    return prisma.driver.delete({ where: { id } });
+    const driver = await this.findById(id);
+    if (!driver) return null;
+    const realDriverId = driver.id;
+    const realUserId = driver.userId;
+
+    // Purge dependent tables in sequence to avoid foreign key constraints
+    await prisma.vehicleAssignment.deleteMany({ where: { driverId: realDriverId } }).catch(() => {});
+    await prisma.driverScore.deleteMany({ where: { driverId: realDriverId } }).catch(() => {});
+    await prisma.event.deleteMany({ where: { driverId: realDriverId } }).catch(() => {});
+    await prisma.tripPoint.deleteMany({ where: { trip: { driverId: realDriverId } } }).catch(() => {});
+    await prisma.trip.deleteMany({ where: { driverId: realDriverId } }).catch(() => {});
+    await prisma.crashReport.deleteMany({ where: { driverId: realDriverId } }).catch(() => {});
+    await prisma.media.deleteMany({ where: { driverId: realDriverId } }).catch(() => {});
+    await prisma.notification.deleteMany({ where: { userId: realUserId } }).catch(() => {});
+    await prisma.auditLog.deleteMany({ where: { userId: realUserId } }).catch(() => {});
+
+    // Delete driver profile
+    const deletedDriver = await prisma.driver.delete({ where: { id: realDriverId } }).catch(() => null);
+
+    // Delete linked user record
+    if (realUserId) {
+      await prisma.user.delete({ where: { id: realUserId } }).catch(() => {});
+    }
+
+    return deletedDriver;
   }
 }
 export const driverRepository = new DriverRepository();

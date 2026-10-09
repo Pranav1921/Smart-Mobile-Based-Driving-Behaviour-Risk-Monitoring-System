@@ -14,6 +14,7 @@ import 'home_screen.dart';
 import 'orders_screen.dart';
 import 'profile_screen.dart';
 import 'trip_screen.dart';
+import '../routes/app_routes.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
@@ -103,7 +104,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          "IMPACT / CRASH DETECTED",
+                          tripProv.isCrashDetected 
+                            ? "IMPACT / CRASH DETECTED" 
+                            : (tripProv.isAdminPinging ? "HQ VERIFICATION REQUEST" : "EMERGENCY SOS ACTIVE"),
                           style: GoogleFonts.spaceGrotesk(
                             fontSize: 12,
                             fontWeight: FontWeight.w900,
@@ -132,7 +135,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      tripProv.crashReason,
+                      tripProv.crashReason.isNotEmpty ? tripProv.crashReason : "Emergency alert broadcast in progress",
                       style: GoogleFonts.spaceGrotesk(
                         fontSize: 11.5,
                         color: const Color(0xFFD6D3D1),
@@ -145,21 +148,21 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                           child: GestureDetector(
                             onTap: () {
                               HapticService.selectionClick();
-                              tripProv.cancelSOS();
+                              tripProv.confirmSafe();
                             },
                             child: Container(
                               height: 38,
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: const Color(0xFF10B981),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Center(
                                 child: Text(
-                                  "I'M OK (DISMISS)",
+                                  "I'M OK — DISMISS",
                                   style: GoogleFonts.spaceGrotesk(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w800,
-                                    color: const Color(0xFF1E1B18),
+                                    color: Colors.white,
                                   ),
                                 ),
                               ),
@@ -172,6 +175,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                             onTap: () {
                               HapticService.heavyImpact();
                               tripProv.triggerManualSOS();
+                              Navigator.pushNamed(context, AppRoutes.crash);
                             },
                             child: Container(
                               height: 38,

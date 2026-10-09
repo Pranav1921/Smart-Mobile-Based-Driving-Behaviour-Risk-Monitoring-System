@@ -18,6 +18,13 @@ class DeliveryOrder {
   final String driverAddress;
   final String customerName;
   final String customerPhone;
+  final bool isDeadZoneRelay;
+
+  String get verificationOtp {
+    if (id.isEmpty) return '4821';
+    final int hash = id.codeUnits.fold(0, (prev, elem) => prev + elem);
+    return (1000 + (hash % 9000)).toString();
+  }
 
   DeliveryOrder({
     required this.id,
@@ -37,6 +44,7 @@ class DeliveryOrder {
     this.driverAddress = 'Sector 4 Depot Hub',
     this.customerName = 'Kavya Sharma',
     this.customerPhone = '+91 94482 67119',
+    this.isDeadZoneRelay = false,
   });
 
   /// Dial the delivery driver's phone number directly
@@ -78,6 +86,7 @@ class DeliveryOrder {
     String? driverAddress,
     String? customerName,
     String? customerPhone,
+    bool? isDeadZoneRelay,
   }) {
     return DeliveryOrder(
       id: id ?? this.id,
@@ -97,6 +106,7 @@ class DeliveryOrder {
       driverAddress: driverAddress ?? this.driverAddress,
       customerName: customerName ?? this.customerName,
       customerPhone: customerPhone ?? this.customerPhone,
+      isDeadZoneRelay: isDeadZoneRelay ?? this.isDeadZoneRelay,
     );
   }
 
@@ -119,6 +129,7 @@ class DeliveryOrder {
       'driverAddress': driverAddress,
       'customerName': customerName,
       'customerPhone': customerPhone,
+      'isDeadZoneRelay': isDeadZoneRelay,
     };
   }
 
@@ -143,6 +154,7 @@ class DeliveryOrder {
       driverAddress: json['driverAddress'] ?? (json['deliveryFrom'] ?? 'Sector 4 Depot Hub'),
       customerName: json['customerName'] ?? 'Kavya Sharma',
       customerPhone: json['customerPhone'] ?? '+91 94482 67119',
+      isDeadZoneRelay: json['isDeadZoneRelay'] == true || (json['id']?.toString().toUpperCase().contains('RELAY') ?? false),
     );
   }
 }

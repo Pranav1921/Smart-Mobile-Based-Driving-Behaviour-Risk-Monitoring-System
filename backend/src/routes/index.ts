@@ -8,6 +8,7 @@ import crashRoutes from './crash.routes';
 import reportRoutes from './report.routes';
 import orderRoutes from './order.routes';
 import alertRoutes from './alert.routes';
+import anomalyRoutes from './anomaly.routes';
 
 const router = Router();
 
@@ -20,5 +21,6 @@ router.use('/crashes', crashRoutes);
 router.use('/reports', reportRoutes);
 router.use('/orders', orderRoutes);
 router.use('/alerts', alertRoutes);
+router.use('/anomalies', anomalyRoutes);
 
 export default router;

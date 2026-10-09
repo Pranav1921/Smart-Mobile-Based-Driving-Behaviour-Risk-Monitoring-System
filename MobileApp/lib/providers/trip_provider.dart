@@ -20,6 +20,7 @@ import '../services/notification_service.dart';
 import '../services/overpass_service.dart';
 import '../services/road_rules_service.dart';
 import '../services/haptic_service.dart';
+import '../services/floating_overlay_service.dart';
 import 'sensor_provider.dart';
 
 class SafetyZone {
@@ -163,6 +164,21 @@ class TripProvider extends ChangeNotifier {
   bool _fatigueWarning120Emitted = false;
   String? _v2vWarning;
   String? get v2vWarning => _v2vWarning;
+
+  List<Map<String, dynamic>> _sameDirectionDrivers = [];
+  List<Map<String, dynamic>> get sameDirectionDrivers => _sameDirectionDrivers;
+
+  String? _v2vAheadAlertMessage;
+  String? get v2vAheadAlertMessage => _v2vAheadAlertMessage;
+  Timer? _v2vAheadDismissTimer;
+
+  Map<String, dynamic>? _pendingCrossDeliveryOffer;
+  Map<String, dynamic>? get pendingCrossDeliveryOffer => _pendingCrossDeliveryOffer;
+
+  bool _isAvailableForRescue = true;
+  bool get isAvailableForRescue => _isAvailableForRescue;
+
+  bool get isDeadZoneActive => SocketService.isDeadZoneManual;
 
   String? _adminBroadcastBanner;
   String? get adminBroadcastBanner => _adminBroadcastBanner;
@@ -451,8 +467,199 @@ class TripProvider extends ChangeNotifier {
       triggerManualSOS();
     };
 
+    SocketService.onV2VProximityMessageCallback = (data) {
+      final msg = data['message']?.toString() ?? '';
+      if (msg.isNotEmpty) {
+        _v2vAheadAlertMessage = msg;
+        _v2vWarning = msg;
+        VoiceService.speak(msg);
+        NotificationService.showSafetyAlert("PROXIMITY RADAR", msg);
+        SensorService.vibrate(duration: 400);
+        _v2vAheadDismissTimer?.cancel();
+        _v2vAheadDismissTimer = Timer(const Duration(seconds: 12), () {
+          _v2vAheadAlertMessage = null;
+          notifyListeners();
+        });
+        notifyListeners();
+      }
+    };
+
+    SocketService.onSameDirectionDriversCallback = (list) {
+      _sameDirectionDrivers = list.map((item) => Map<String, dynamic>.from(item as Map)).toList();
+      notifyListeners();
+    };
+
+    SocketService.onCrossDeliveryAvailableCallback = (data) {
+      final troubledId = data['troubledDriverId']?.toString();
+      if (troubledId != _currentDriverId) {
+        _pendingCrossDeliveryOffer = data;
+        final troubledName = data['troubledDriverName'] ?? 'Fleet Driver';
+        final split = data['relayDriverSplit'] ?? 70;
+        VoiceService.speak("Relay mission alert: Driver $troubledName needs handover. Earn ₹$split for finishing delivery.");
+        NotificationService.showSafetyAlert("CROSS-DELIVERY HANDOVER", "Relay delivery available: Earn ₹$split (70% split)!");
+        SensorService.vibrate(duration: 800);
+        notifyListeners();
+      }
+    };
+
+    SocketService.onCrossDeliveryCredited30Callback = (data) {
+      final amount = (data['amountCredited'] as num?)?.toDouble() ?? 30.0;
+      _todayEarnedIncome += amount;
+      _activeOrder = null;
+      _isTripActive = false;
+      final msg = data['message']?.toString() ?? "Handover complete: ₹${amount.toInt()} credited.";
+      VoiceService.speak(msg);
+      NotificationService.showSafetyAlert("CROSS-DELIVERY COMPENSATION", msg);
+      notifyListeners();
+    };
+
+    SocketService.onCrossDeliveryAssigned70Callback = (data) {
+      final dropAddress = data['dropAddress']?.toString() ?? 'Assigned Drop Point';
+      final payout = (data['amountToEarn'] as num?)?.toDouble() ?? 70.0;
+      final order = DeliveryOrder(
+        id: data['orderId']?.toString() ?? 'RELAY-${DateTime.now().millisecondsSinceEpoch}',
+        pickupAddress: 'Transfer Point (Troubled Operator)',
+        dropAddress: dropAddress,
+        distanceKm: 3.5,
+        estimatedTimeMinutes: 12,
+        payoutAmount: payout,
+        pickupLat: _currentLat ?? 0.0,
+        pickupLng: _currentLng ?? 0.0,
+        dropLat: (data['dropLat'] as num?)?.toDouble() ?? (_currentLat ?? 0.0) + 0.01,
+        dropLng: (data['dropLng'] as num?)?.toDouble() ?? (_currentLng ?? 0.0) + 0.01,
+      );
+      _activeOrder = order;
+      _isTripActive = true;
+      _pendingCrossDeliveryOffer = null;
+      VoiceService.speak("Mission updated! Deliver to $dropAddress to claim ₹${payout.toInt()}.");
+      NotificationService.showSafetyAlert("MISSION ACCEPTED", "Deliver to $dropAddress (₹${payout.toInt()})");
+      notifyListeners();
+    };
+
+    SocketService.onDriverAvailabilityUpdatedCallback = (data) {
+      if (data['driverId'] == _currentDriverId) {
+        _isAvailableForRescue = data['isAvailableForRescue'] == true;
+        VoiceService.speak(_isAvailableForRescue ? "Fleet Command marked you available for rescue." : "Fleet Command set your standby off-duty.");
+        notifyListeners();
+      }
+    };
+
+    SocketService.onEmergencyNearbyDriverAlertCallback = (data) {
+      final troubledId = data['troubledDriverId']?.toString();
+      if (troubledId != _currentDriverId) {
+        _pendingCrossDeliveryOffer = data;
+        final troubledName = data['troubledDriverName'] ?? 'Fleet Driver';
+        final dist = data['distanceKm'] ?? '1.5';
+        final bounty = data['relayDriverSplit'] ?? 70;
+        VoiceService.speak("Emergency SOS Alert: Driver $troubledName involved in incident $dist kilometers away. Partnership rescue available for ₹$bounty.");
+        NotificationService.showSafetyAlert("🚨 NEARBY DRIVER SOS / IMPACT", "Driver $troubledName needs assistance ($dist km away). Earn ₹$bounty (70% split) via Partnership Relay!");
+        SensorService.vibrate(duration: 1200);
+        notifyListeners();
+      }
+    };
+
+    SocketService.onPartnershipRelayAssignedCallback = (data) {
+      final dropAddress = data['dropAddress']?.toString() ?? 'Assigned Drop Point';
+      final payout = (data['relayDriverSplit'] as num?)?.toDouble() ?? (data['amountToEarn'] as num?)?.toDouble() ?? 70.0;
+      final order = DeliveryOrder(
+        id: data['orderId']?.toString() ?? 'RELAY-${DateTime.now().millisecondsSinceEpoch}',
+        pickupAddress: 'Partnership Handover Point (${data['troubledDriverName'] ?? 'Troubled Operator'})',
+        dropAddress: dropAddress,
+        distanceKm: 3.5,
+        estimatedTimeMinutes: 12,
+        payoutAmount: payout,
+        pickupLat: _currentLat ?? 0.0,
+        pickupLng: _currentLng ?? 0.0,
+        dropLat: (data['dropLat'] as num?)?.toDouble() ?? (_currentLat ?? 0.0) + 0.01,
+        dropLng: (data['dropLng'] as num?)?.toDouble() ?? (_currentLng ?? 0.0) + 0.01,
+      );
+      _activeOrder = order;
+      _isTripActive = true;
+      _pendingCrossDeliveryOffer = null;
+      VoiceService.speak("Partnership Relay Dispatched! Pick up parcel from ${data['troubledDriverName'] ?? 'driver'} and deliver to $dropAddress to claim ₹${payout.toInt()}.");
+      NotificationService.showSafetyAlert("🤝 PARTNERSHIP MISSION DISPATCHED", "Deliver to $dropAddress to earn ₹${payout.toInt()} (70% bounty)");
+      SensorService.vibrate(duration: 1000);
+      notifyListeners();
+    };
+
+    SocketService.onPartnershipRelayInitiatedCallback = (data) {
+      final split = data['troubledDriverSplit'] ?? 30;
+      final relayName = data['relayDriverName'] ?? 'Relay Driver';
+      final msg = "HQ assigned $relayName to complete your delivery! ₹$split (30% split) has been credited to you.";
+      _todayEarnedIncome += (split as num).toDouble();
+      _activeOrder = null;
+      _isTripActive = false;
+      VoiceService.speak(msg);
+      NotificationService.showSafetyAlert("🤝 PARTNERSHIP RELAY ACTIVE", msg);
+      notifyListeners();
+    };
+
+    SocketService.onDeadZoneStatusChangedCallback = (isDeadZone) {
+      notifyListeners();
+    };
+
     _initDeviceGps();
     _startFullSensorSuite();
+  }
+
+  void toggleDeadZoneMode() {
+    final dId = _currentDriverId ?? 'DRV-PTR-2026-001';
+    final isActive = SocketService.toggleManualDeadZone(dId);
+    VoiceService.speak(isActive
+        ? "Dead zone peer mesh relay activated. Transmitting via nearest drivers."
+        : "Dead zone mode deactivated. Standard uplink restored.");
+    SensorService.vibrate(duration: 300);
+    notifyListeners();
+  }
+
+  void requestCrossDeliveryHandover() {
+    if (_activeOrder == null) {
+      VoiceService.speak("No active mission in progress to hand over.");
+      return;
+    }
+    final dId = _currentDriverId ?? 'DRV-PTR-2026-001';
+    final dName = _currentDriverName ?? 'Operator';
+    SocketService.emitInitiateCrossDeliveryHandover({
+      'orderId': _activeOrder!.id,
+      'troubledDriverId': dId,
+      'troubledDriverName': dName,
+      'pickupAddress': _activeOrder!.pickupAddress,
+      'dropAddress': _activeOrder!.dropAddress,
+      'dropLat': _activeOrder!.dropLat,
+      'dropLng': _activeOrder!.dropLng,
+      'packageItems': _activeOrder!.packageItems,
+      'totalAmount': _activeOrder!.payoutAmount,
+      'reason': _crashReason.isNotEmpty ? _crashReason : "Operator requested cross-delivery handover",
+    });
+    VoiceService.speak("Cross delivery handover broadcasted to passing fleet drivers. 30 percent base split reserved for you.");
+    NotificationService.showSafetyAlert("HANDOVER REQUESTED", "30% base compensation reserved. Nearby drivers notified.");
+    notifyListeners();
+  }
+
+  void acceptCrossDeliveryOffer(Map<String, dynamic> offer) {
+    final myId = _currentDriverId ?? 'DRV-PTR-2026-001';
+    final myName = _currentDriverName ?? 'Relay Driver';
+    SocketService.emitAcceptCrossDeliveryHandover({
+      'handoverId': offer['handoverId'],
+      'orderId': offer['orderId'],
+      'relayDriverId': myId,
+      'relayDriverName': myName,
+      'troubledDriverId': offer['troubledDriverId'],
+      'totalAmount': offer['totalAmount'],
+      'troubledDriverSplit': offer['troubledDriverSplit'],
+      'relayDriverSplit': offer['relayDriverSplit'],
+      'dropAddress': offer['dropAddress'],
+      'dropLat': offer['dropLat'],
+      'dropLng': offer['dropLng'],
+      'packageItems': offer['packageItems'],
+    });
+    _pendingCrossDeliveryOffer = null;
+    notifyListeners();
+  }
+
+  void dismissCrossDeliveryOffer() {
+    _pendingCrossDeliveryOffer = null;
+    notifyListeners();
   }
 
   DateTime? _lastIdleHeartbeatTime;
@@ -468,8 +675,11 @@ class TripProvider extends ChangeNotifier {
         _currentDriverName = profile.name.replaceAll(RegExp(r'\s+applicant$', caseSensitive: false), '').trim();
       }
       if (profile.regionId.isNotEmpty) _currentRegionId = profile.regionId;
-      notifyListeners();
     }
+    _currentDriverId ??= (_currentProfile?.driverId.isNotEmpty == true ? _currentProfile!.driverId : 'DRV-PTR-2026-001');
+    _currentDriverName ??= (_currentProfile?.name.isNotEmpty == true ? _currentProfile!.name : 'Pranav Rao');
+    _currentRegionId ??= 'puttur_taluk';
+    notifyListeners();
 
     final pos = await GpsService.getCurrentLocation();
     if (pos != null) {
@@ -477,9 +687,7 @@ class TripProvider extends ChangeNotifier {
       _currentLng = pos.longitude;
       _currentSpeed = pos.speed * 3.6;
       _currentHeading = pos.heading;
-      if (_currentDriverId != null && _currentDriverId != 'agent-x' && _currentDriverId!.isNotEmpty) {
-        _emitIdleHeartbeat(pos.latitude, pos.longitude, _currentSpeed, _currentHeading);
-      }
+      _emitIdleHeartbeat(pos.latitude, pos.longitude, _currentSpeed, _currentHeading);
       notifyListeners();
     }
 
@@ -488,7 +696,7 @@ class TripProvider extends ChangeNotifier {
       _currentLng = pos.longitude;
       _currentSpeed = pos.speed * 3.6;
       _currentHeading = pos.heading;
-      if (!_isShiftActive && _currentDriverId != null && _currentDriverId != 'agent-x' && _currentDriverId!.isNotEmpty) {
+      if (!_isShiftActive) {
         _emitIdleHeartbeat(pos.latitude, pos.longitude, _currentSpeed, _currentHeading);
       }
       notifyListeners();
@@ -496,25 +704,29 @@ class TripProvider extends ChangeNotifier {
   }
 
   void _emitIdleHeartbeat(double lat, double lng, double speed, double heading) {
-    if (_currentDriverId == null || _currentDriverId == 'agent-x' || _currentDriverId!.isEmpty) {
-      return;
-    }
+    final dId = (_currentDriverId != null && _currentDriverId!.isNotEmpty && _currentDriverId != 'agent-x')
+        ? _currentDriverId!
+        : (_currentProfile?.driverId.isNotEmpty == true ? _currentProfile!.driverId : 'DRV-PTR-2026-001');
+    final dName = (_currentDriverName != null && _currentDriverName!.isNotEmpty)
+        ? _currentDriverName!
+        : (_currentProfile?.name.isNotEmpty == true ? _currentProfile!.name : 'Pranav Rao');
+
     final now = DateTime.now();
     if (_lastIdleHeartbeatTime != null && now.difference(_lastIdleHeartbeatTime!).inSeconds < 4) {
       return;
     }
     _lastIdleHeartbeatTime = now;
     SocketService.emitGpsUpdate(
-      driverId: _currentDriverId!,
-      driverName: _currentDriverName ?? 'Driver',
-      regionId: _currentRegionId,
+      driverId: dId,
+      driverName: dName,
+      regionId: _currentRegionId ?? 'puttur_taluk',
       lat: lat,
       lng: lng,
       speed: speed,
       heading: heading,
       status: 'idle',
       email: _currentProfile?.email,
-      phoneNumber: _currentProfile?.phoneNumber,
+      phoneNumber: _currentProfile?.phoneNumber ?? '+91 94812 55667',
       emergencyContactName: _currentProfile?.emergencyContactName,
       emergencyContactPhone: _currentProfile?.emergencyContactPhone,
       familyRelationship: _currentProfile?.familyRelationship,
@@ -732,13 +944,19 @@ class TripProvider extends ChangeNotifier {
   Future<DriverTrip> completeActiveOrder() async {
     final order = _activeOrder;
     final payout = order?.payoutAmount ?? (order?.distanceKm != null && order!.distanceKm > 0 ? (order.distanceKm * 15.0) : 75.0);
+    final bool isRelay = order?.isDeadZoneRelay == true || (order?.id.contains('RELAY') ?? false);
 
-    // Calculate Safe Ride Reward Points based on percentage score
+    // Calculate Safe Ride Reward Points based on completed orders & safe driving performance
     final int ridePoints = calculateTripPoints(
       safetyScore: _tripSafetyScore,
       distanceKm: order?.distanceKm ?? 4.8,
       violationsCount: _journeyViolations.length,
+      isOrderDelivery: true,
+      isRelayOrder: isRelay,
     );
+
+    final int orderBasePts = isRelay ? 75 : 50;
+    final int safetyBonusPts = max(0, ridePoints - orderBasePts);
 
     final trip = DriverTrip(
       id: 'trip-${DateTime.now().millisecondsSinceEpoch}',
@@ -786,6 +1004,7 @@ class TripProvider extends ChangeNotifier {
     SocketService.emitTripAnalysis({
       'driverId': _currentDriverId ?? 'mobile-driver',
       'tripId': trip.id,
+      'orderId': trip.orderId,
       'startTime': trip.startTime.toIso8601String(),
       'endTime': trip.endTime?.toIso8601String() ?? DateTime.now().toIso8601String(),
       'distanceKm': trip.distanceKm,
@@ -793,13 +1012,15 @@ class TripProvider extends ChangeNotifier {
       'averageSpeed': trip.averageSpeed,
       'maxSpeed': trip.maxSpeed,
       'safetyScore': trip.safetyScore,
-      'harshBrakingCount': 0,
+      'harshBrakingCount': _journeyViolations.where((v) => v.ruleType.toLowerCase().contains('brak') || v.ruleTitle.toLowerCase().contains('brak') || v.description.toLowerCase().contains('brak')).length,
       'lateralGForce': 0.24,
       'deliveryFrom': trip.deliveryFrom,
       'deliveryTo': trip.deliveryTo,
       'payout': payout,
       'pointsEarned': ridePoints,
       'totalPoints': _totalClaimedPoints,
+      'orderPoints': orderBasePts,
+      'safetyDrivingPoints': safetyBonusPts,
     });
 
     final String tierName = _tripSafetyScore >= 95.0
@@ -810,7 +1031,7 @@ class TripProvider extends ChangeNotifier {
                 ? "Bronze Tier (Safe)"
                 : (_tripSafetyScore >= 60.0 ? "Cautionary Pass" : "At-Risk Driving")));
 
-    VoiceService.speak("Mission completed! Safety score: ${_tripSafetyScore.toStringAsFixed(0)} percent. Earned ₹${payout.toStringAsFixed(0)} and +$ridePoints reward points for $tierName.");
+    VoiceService.speak("Mission completed! Safety score: ${_tripSafetyScore.toStringAsFixed(0)} percent. Earned ₹${payout.toStringAsFixed(0)} and +$ridePoints reward points with +$orderBasePts for order delivery and +$safetyBonusPts for safe driving ($tierName).");
 
     if (_isShiftActive || SocketService.isConnected) {
       SocketService.emitGpsUpdate(
@@ -827,46 +1048,57 @@ class TripProvider extends ChangeNotifier {
       );
     }
     
+    FloatingOverlayService.hide();
+    NotificationService.clearActiveOrderNotification();
     evaluateDailyRules();
     notifyListeners();
     return trip;
   }
 
-  /// Calculates driver reward points proportionally to trip safety percentage score & distance
+  /// Calculates driver reward points proportionally to completed orders, safety score & distance
   static int calculateTripPoints({
     required double safetyScore,
     required double distanceKm,
     required int violationsCount,
+    bool isOrderDelivery = false,
+    bool isRelayOrder = false,
   }) {
-    // 1. Base Points (scaled proportionally to percentage score 0 - 100%)
-    int baseScorePoints;
+    // 1. Order Completion Base Points
+    int orderPoints = 0;
+    if (isOrderDelivery) {
+      // Base reward: +50 pts for regular order delivery, +75 pts for 70/30 Regional Relay order
+      orderPoints = isRelayOrder ? 75 : 50;
+    }
+
+    // 2. Safety Driving Score Points (Proportional to safe driving tier)
+    int safetyScorePoints;
     if (safetyScore >= 95.0) {
-      // Gold Tier (95% - 100%): 100 base points
-      baseScorePoints = 100;
+      // Gold Tier (95% - 100%): 100 base points for flawless driving
+      safetyScorePoints = 100;
     } else if (safetyScore >= 85.0) {
-      // Silver Tier (85% - 94%): 75 to 90 pts proportional to percentage
-      baseScorePoints = (safetyScore * 0.90).round();
+      // Silver Tier (85% - 94%): 75 to 88 pts proportional to percentage
+      safetyScorePoints = (safetyScore * 0.90).round();
     } else if (safetyScore >= 75.0) {
-      // Bronze Tier (75% - 84%): 50 to 65 pts
-      baseScorePoints = (safetyScore * 0.70).round();
+      // Bronze Tier (75% - 84%): 50 to 62 pts
+      safetyScorePoints = (safetyScore * 0.70).round();
     } else if (safetyScore >= 60.0) {
-      // Cautionary Pass (60% - 74%): 25 to 40 pts
-      baseScorePoints = (safetyScore * 0.45).round();
+      // Cautionary Pass (60% - 74%): 25 to 35 pts
+      safetyScorePoints = (safetyScore * 0.45).round();
     } else {
-      // Critical / At-Risk (<60%): Minimal participation token points (5 - 10 pts)
-      baseScorePoints = max(5, (safetyScore * 0.15).round());
+      // Critical / At-Risk (<60%): Minimal participation token points
+      safetyScorePoints = max(10, (safetyScore * 0.20).round());
     }
 
-    // 2. Clean Ride Bonus (0 violations during the entire trip)
+    // 3. Clean Ride Bonus (0 violations during the entire trip and high safety)
     int cleanBonus = 0;
-    if (violationsCount == 0 && safetyScore >= 90.0) {
-      cleanBonus = 20; // +20 bonus pts for zero violations
+    if (violationsCount == 0 && safetyScore >= 85.0) {
+      cleanBonus = 25; // +25 bonus pts for zero violations
     }
 
-    // 3. Mission Distance Factor: +2 points per km completed (up to +30 pts)
-    final int distanceBonus = (distanceKm * 2.0).round().clamp(0, 30);
+    // 4. Mission Distance Factor: +2 points per km completed (up to +40 pts)
+    final int distanceBonus = (distanceKm * 2.0).round().clamp(0, 40);
 
-    final int totalPoints = (baseScorePoints + cleanBonus + distanceBonus).clamp(5, 200);
+    final int totalPoints = (orderPoints + safetyScorePoints + cleanBonus + distanceBonus).clamp(10, 300);
     return totalPoints;
   }
 
@@ -2584,11 +2816,33 @@ class TripProvider extends ChangeNotifier {
   }
 
   void confirmSafe() {
+    final dId = (_currentDriverId != null && _currentDriverId!.isNotEmpty && _currentDriverId != 'agent-x')
+        ? _currentDriverId!
+        : (_currentProfile?.driverId.isNotEmpty == true ? _currentProfile!.driverId : 'DRV-PTR-2026-001');
+    final dName = (_currentDriverName != null && _currentDriverName!.isNotEmpty)
+        ? _currentDriverName!
+        : (_currentProfile?.name.isNotEmpty == true ? _currentProfile!.name : 'Pranav Rao');
+
     SocketService.emitSafetyResponse(
-      driverId: _currentDriverId,
-      driverName: _currentDriverName,
+      driverId: dId,
+      driverName: dName,
     );
-    VoiceService.speak("Safety confirmed. Link restored to normal.");
+
+    // Immediately transmit safe GPS telemetry packet so admin map & driver card instantly reflect SAFE status
+    SocketService.emitGpsUpdate(
+      driverId: dId,
+      driverName: dName,
+      regionId: _currentRegionId ?? 'puttur_taluk',
+      lat: _currentLat ?? 12.7749,
+      lng: _currentLng ?? 75.2023,
+      speed: _currentSpeed,
+      heading: _currentHeading,
+      status: 'safe',
+      email: _currentProfile?.email,
+      phoneNumber: _currentProfile?.phoneNumber ?? '+91 94812 55667',
+    );
+
+    VoiceService.speak("Safety confirmed. HQ notified that you are safe.");
     cancelSOS();
   }
 
@@ -2612,9 +2866,11 @@ class TripProvider extends ChangeNotifier {
       lat: _currentLat ?? 12.7749,
       lng: _currentLng ?? 75.2023,
       speed: _currentSpeed,
-      phone: _currentProfile?.phone ?? '+91 94812 55667',
-      vehiclePlate: _currentProfile?.vehicleNumber ?? 'KA-19-PT-2026',
+      phone: _currentProfile?.phoneNumber ?? '+91 94812 55667',
+      vehiclePlate: _currentProfile?.vehiclePlateNumber ?? 'KA-19-PT-2026',
       reason: "Manual SOS Panic Triggered by Operator",
+      region: 'Puttur',
+      regionId: _currentRegionId ?? 'puttur_taluk',
     );
     _escalateEmergency(isSos: true);
     notifyListeners();

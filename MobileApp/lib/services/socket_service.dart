@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'api_service.dart';
 import 'voice_service.dart';
@@ -18,12 +17,58 @@ class SocketService {
   static String? get connectedHost => _connectedHost;
   static bool get isConnected => _socket?.connected ?? false;
 
+  static Function(Map<String, dynamic> data)? onV2VProximityMessageCallback;
+  static Function(List<dynamic> list)? onSameDirectionDriversCallback;
+  static Function(Map<String, dynamic> data)? onCrossDeliveryAvailableCallback;
+  static Function(Map<String, dynamic> data)? onCrossDeliveryCredited30Callback;
+  static Function(Map<String, dynamic> data)? onCrossDeliveryAssigned70Callback;
+  static Function(Map<String, dynamic> data)? onDriverAvailabilityUpdatedCallback;
+  static Function(Map<String, dynamic> data)? onEmergencyNearbyDriverAlertCallback;
+  static Function(Map<String, dynamic> data)? onPartnershipRelayAssignedCallback;
+  static Function(Map<String, dynamic> data)? onPartnershipRelayInitiatedCallback;
+
+  static Function(bool isDeadZone)? onDeadZoneStatusChangedCallback;
   static Map<String, dynamic>? _lastPendingGpsUpdate;
   static final List<Map<String, dynamic>> _offlineBuffer = [];
   static final List<Map<String, dynamic>> _pendingBreakdownAlerts = [];
   static final List<Map<String, dynamic>> _pendingSosAlerts = [];
-  static int get offlineBufferedCount => _offlineBuffer.length + _pendingBreakdownAlerts.length + _pendingSosAlerts.length;
-  static bool get isGhatModeActive => !isConnected && (_offlineBuffer.isNotEmpty || _pendingBreakdownAlerts.isNotEmpty || _pendingSosAlerts.isNotEmpty);
+  static final List<Map<String, dynamic>> _pendingCrashAlerts = [];
+  static int get offlineBufferedCount => _offlineBuffer.length + _pendingBreakdownAlerts.length + _pendingSosAlerts.length + _pendingCrashAlerts.length;
+  static bool _manualDeadZoneActive = false;
+  static bool get isDeadZoneManual => _manualDeadZoneActive;
+  static bool get isGhatModeActive => _manualDeadZoneActive;
+
+  static bool toggleManualDeadZone(String driverId) {
+    _manualDeadZoneActive = !_manualDeadZoneActive;
+    if (_socket != null && _socket!.connected) {
+      _socket?.emit('driver_toggle_deadzone', {
+        'driverId': driverId,
+        'isDeadZone': _manualDeadZoneActive,
+        'reason': _manualDeadZoneActive ? 'Single-click P2P Dead Zone Mesh activated' : 'Standard uplink restored',
+      });
+    }
+    if (!_manualDeadZoneActive) {
+      forceSyncBuffer();
+    }
+    onDeadZoneStatusChangedCallback?.call(_manualDeadZoneActive);
+    return _manualDeadZoneActive;
+  }
+
+  static void setManualDeadZone(bool active, String driverId) {
+    if (_manualDeadZoneActive == active) return;
+    _manualDeadZoneActive = active;
+    if (_socket != null && _socket!.connected) {
+      _socket?.emit('driver_toggle_deadzone', {
+        'driverId': driverId,
+        'isDeadZone': _manualDeadZoneActive,
+        'reason': _manualDeadZoneActive ? 'Single-click P2P Dead Zone Mesh activated' : 'Standard uplink restored',
+      });
+    }
+    if (!_manualDeadZoneActive) {
+      forceSyncBuffer();
+    }
+    onDeadZoneStatusChangedCallback?.call(_manualDeadZoneActive);
+  }
 
   static StreamSubscription<String>? _hostSubscription;
   static int _consecutiveErrors = 0;
@@ -101,6 +146,18 @@ class SocketService {
           _socket?.emit('driver_sos_alert', sos);
           _socket?.emit('sos_alert', sos);
           print('[SocketService] 🚨 GHAT / DEAD ZONE RECONNECT: Emitted queued SOS alert: ${sos['reason']}');
+        }
+      }
+
+      // Burst-sync pending Crash / Severe Impact alerts queued during Dead Zone mode
+      if (_pendingCrashAlerts.isNotEmpty) {
+        final pendingCrashes = List<Map<String, dynamic>>.from(_pendingCrashAlerts);
+        _pendingCrashAlerts.clear();
+        for (final crash in pendingCrashes) {
+          _socket?.emit('crash_event', crash);
+          _socket?.emit('crash_detected', crash);
+          _socket?.emit('deadzone_impact_sync', crash);
+          print('[SocketService] 🚨 DEAD ZONE RECONNECT: Emitted queued crash impact: ${crash['reason']}');
         }
       }
 
@@ -254,10 +311,107 @@ class SocketService {
       }
     });
 
+    socket.on('v2v_proximity_message', (data) {
+      print('[SocketService] 🚗 V2V Proximity Alert: $data');
+      if (data is Map<String, dynamic>) {
+        onV2VProximityMessageCallback?.call(data);
+      } else if (data is Map) {
+        onV2VProximityMessageCallback?.call(Map<String, dynamic>.from(data));
+      }
+    });
+
+    socket.on('same_direction_drivers', (data) {
+      if (data is List) {
+        onSameDirectionDriversCallback?.call(data);
+      }
+    });
+
+    socket.on('cross_delivery_available', (data) {
+      print('[SocketService] 🤝 Cross-Delivery Available: $data');
+      if (data is Map<String, dynamic>) {
+        onCrossDeliveryAvailableCallback?.call(data);
+      } else if (data is Map) {
+        onCrossDeliveryAvailableCallback?.call(Map<String, dynamic>.from(data));
+      }
+    });
+
+    socket.on('cross_delivery_credited_30', (data) {
+      print('[SocketService] 💰 Cross-Delivery 30% Base Credited: $data');
+      if (data is Map<String, dynamic>) {
+        onCrossDeliveryCredited30Callback?.call(data);
+      } else if (data is Map) {
+        onCrossDeliveryCredited30Callback?.call(Map<String, dynamic>.from(data));
+      }
+    });
+
+    socket.on('cross_delivery_assigned_70', (data) {
+      print('[SocketService] 📦 Cross-Delivery Assigned (70% Payout): $data');
+      if (data is Map<String, dynamic>) {
+        onCrossDeliveryAssigned70Callback?.call(data);
+      } else if (data is Map) {
+        onCrossDeliveryAssigned70Callback?.call(Map<String, dynamic>.from(data));
+      }
+    });
+
+    socket.on('driver_availability_updated', (data) {
+      if (data is Map<String, dynamic>) {
+        onDriverAvailabilityUpdatedCallback?.call(data);
+      } else if (data is Map) {
+        onDriverAvailabilityUpdatedCallback?.call(Map<String, dynamic>.from(data));
+      }
+    });
+
+    socket.on('emergency_nearby_driver_alert', (data) {
+      print('[SocketService] 🚨 Received Nearby Driver Emergency Alert: $data');
+      if (data is Map<String, dynamic>) {
+        onEmergencyNearbyDriverAlertCallback?.call(data);
+      } else if (data is Map) {
+        onEmergencyNearbyDriverAlertCallback?.call(Map<String, dynamic>.from(data));
+      }
+    });
+
+    socket.on('driver_deadzone_status', (data) {
+      if (data is Map) {
+        final isDead = data['isDeadZone'] == true;
+        _manualDeadZoneActive = isDead;
+        onDeadZoneStatusChangedCallback?.call(isDead);
+      }
+    });
+
+    socket.on('partnership_relay_assigned', (data) {
+      print('[SocketService] 🤝 Partnership Relay Assigned (70% Bounty): $data');
+      if (data is Map<String, dynamic>) {
+        onPartnershipRelayAssignedCallback?.call(data);
+      } else if (data is Map) {
+        onPartnershipRelayAssignedCallback?.call(Map<String, dynamic>.from(data));
+      }
+    });
+
+    socket.on('partnership_relay_initiated', (data) {
+      print('[SocketService] 🤝 Partnership Relay Initiated (30% Credit): $data');
+      if (data is Map<String, dynamic>) {
+        onPartnershipRelayInitiatedCallback?.call(data);
+      } else if (data is Map) {
+        onPartnershipRelayInitiatedCallback?.call(Map<String, dynamic>.from(data));
+      }
+    });
+
     socket.onDisconnect((_) {
        print('[SocketService] 🔌 Link Severed from host');
        connectionStatus = "Disconnected";
     });
+  }
+
+  static void emitInitiateCrossDeliveryHandover(Map<String, dynamic> data) {
+    if (_socket != null && _socket!.connected) {
+      _socket?.emit('initiate_cross_delivery_handover', data);
+    }
+  }
+
+  static void emitAcceptCrossDeliveryHandover(Map<String, dynamic> data) {
+    if (_socket != null && _socket!.connected) {
+      _socket?.emit('accept_cross_delivery_handover', data);
+    }
   }
 
   static Function(Map<String, dynamic> data)? onJobAssignedCallback;
@@ -319,7 +473,6 @@ class SocketService {
     double? accelZ,
     List<Map<String, dynamic>>? blackBoxData,
   }) {
-    if (_socket == null || !_socket!.connected) return;
     final payload = {
       'driverId': driverId,
       'reason': reason,
@@ -334,9 +487,18 @@ class SocketService {
       'accelZ': accelZ ?? 3.8,
       'blackBoxData': blackBoxData ?? [],
       'timestamp': DateTime.now().toIso8601String(),
+      'isDeadZone': _manualDeadZoneActive || !isConnected,
     };
+
+    if (_socket == null || !_socket!.connected || _manualDeadZoneActive) {
+      _pendingCrashAlerts.add(payload);
+      print('[SocketService] 📦 DEAD ZONE: Stored severe collision impact event offline (total buffered: ${_pendingCrashAlerts.length})');
+      return;
+    }
+
     _socket?.emit('crash_event', payload);
     _socket?.emit('crash_detected', payload);
+    _socket?.emit('deadzone_impact_sync', payload);
   }
 
   static void emitEmergencyEscalation({required String driverId, String? reason}) {
@@ -400,12 +562,16 @@ class SocketService {
 
   static void emitSafetyResponse({String? driverId, String? driverName}) {
     if (_socket == null || !_socket!.connected) return;
-    _socket?.emit('safety_response', {
+    final payload = {
       'driverId': driverId,
       'driverName': driverName,
       'status': 'safe',
+      'reason': 'Operator confirmed SAFE on mobile device',
       'timestamp': DateTime.now().toIso8601String(),
-    });
+    };
+    _socket?.emit('safety_response', payload);
+    _socket?.emit('driver_safety_confirmed', payload);
+    _socket?.emit('driver_safe', payload);
   }
 
   static void emitLeaveStatus({
@@ -511,16 +677,18 @@ class SocketService {
 
     _lastPendingGpsUpdate = payload;
 
-    if (_socket != null && _socket!.connected) {
+    if (_socket != null && _socket!.connected && !_manualDeadZoneActive) {
       _socket?.emit('gps_update', payload);
     } else {
       if (_offlineBuffer.length >= 500) {
         _offlineBuffer.removeAt(0); // FIFO drop oldest point
       }
       _offlineBuffer.add(payload);
-      _consecutiveErrors++;
-      if (_consecutiveErrors >= 4 && !_isRediscovering) {
-        _attemptAutoRecovery("demo-driver-token-${DateTime.now().millisecondsSinceEpoch}");
+      if (!_manualDeadZoneActive) {
+        _consecutiveErrors++;
+        if (_consecutiveErrors >= 4 && !_isRediscovering) {
+          _attemptAutoRecovery("demo-driver-token-${DateTime.now().millisecondsSinceEpoch}");
+        }
       }
     }
   }
@@ -544,6 +712,9 @@ class SocketService {
       'latitude': lat,
       'longitude': lng,
       'vehiclePlate': vehiclePlate ?? 'KA-19-PT-2026',
+      'region': 'Puttur',
+      'regionId': 'puttur_taluk',
+      'status': 'emergency',
       'timestamp': DateTime.now().millisecondsSinceEpoch,
     };
     if (_socket != null && _socket!.connected) {
@@ -564,6 +735,8 @@ class SocketService {
     String? phone,
     String? vehiclePlate,
     double? speed,
+    String? region,
+    String? regionId,
   }) {
     final payload = {
       'id': 'SOS-${DateTime.now().millisecondsSinceEpoch}',
@@ -576,6 +749,9 @@ class SocketService {
       'speed': speed ?? 0.0,
       'phone': phone ?? '+91 94812 55667',
       'vehiclePlate': vehiclePlate ?? 'KA-19-PT-2026',
+      'region': region ?? 'Puttur',
+      'regionId': regionId ?? 'puttur_taluk',
+      'status': 'emergency',
       'timestamp': DateTime.now().toUtc().toIso8601String(),
     };
     if (_socket != null && _socket!.connected) {
@@ -596,6 +772,16 @@ class SocketService {
       for (final sos in pendingSos) {
         _socket?.emit('driver_sos_alert', sos);
         _socket?.emit('sos_alert', sos);
+      }
+    }
+    if (_pendingCrashAlerts.isNotEmpty) {
+      final pendingCrashes = List<Map<String, dynamic>>.from(_pendingCrashAlerts);
+      _pendingCrashAlerts.clear();
+      for (final crash in pendingCrashes) {
+        _socket?.emit('crash_event', crash);
+        _socket?.emit('crash_detected', crash);
+        _socket?.emit('deadzone_impact_sync', crash);
+        print('[SocketService] 🚨 DEAD ZONE MANUAL SYNC: Emitted queued crash impact: ${crash['reason']}');
       }
     }
     if (_pendingBreakdownAlerts.isNotEmpty) {

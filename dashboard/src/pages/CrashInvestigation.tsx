@@ -4,7 +4,7 @@ import {
   ShieldAlert, Activity, Play, Volume2, MapPin,
   Clock, ShieldCheck, XCircle, ChevronRight, CheckCircle2,
   FileSearch, Camera, Mic, Info, Phone, Send, User, TriangleAlert as AlertTriangle,
-  ExternalLink, HardDriveDownload, Search, HeartPulse, Building2, Eye, Pause,
+  ExternalLink, Search, HeartPulse, Building2, Eye, Pause,
   Loader2, Zap, MessageSquare, Video, Radio, Siren, ArrowLeft, Lock, Unlock,
   Film, Download, Car
 } from 'lucide-react'
@@ -215,7 +215,7 @@ export default function CrashInvestigation() {
             className="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 shadow-lg shadow-red-600/25 active:scale-95"
             title="Generate and print official MoRTH standard police and insurance forensic crash dossier"
           >
-            <HardDriveDownload size={16} />
+            <Download size={16} />
             <span>Forensic PDF Report</span>
           </button>
           <button

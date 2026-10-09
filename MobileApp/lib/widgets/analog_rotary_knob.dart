@@ -86,10 +86,10 @@ class _AnalogRotaryKnobState extends State<AnalogRotaryKnob> {
             child: Container(
               width: widget.size,
               height: widget.size,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: HardwarePalette.debossedChassis,
-                boxShadow: [
+                boxShadow: const [
                   // Stamped debossed chassis recess shadow
                   BoxShadow(
                     color: Colors.black,

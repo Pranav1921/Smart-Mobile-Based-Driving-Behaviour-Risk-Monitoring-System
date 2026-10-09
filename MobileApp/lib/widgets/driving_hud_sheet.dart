@@ -38,7 +38,7 @@ class DrivingHudSheet extends StatelessWidget {
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.74,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: HardwarePalette.obsidianChassis,
         border: Border(top: BorderSide(color: HardwarePalette.matrixBorder, width: 1.0)),
       ),
@@ -47,7 +47,7 @@ class DrivingHudSheet extends StatelessWidget {
           // Header Deck Bar
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               color: HardwarePalette.charcoalSurface,
               border: Border(bottom: BorderSide(color: HardwarePalette.matrixBorder, width: 1.0)),
             ),

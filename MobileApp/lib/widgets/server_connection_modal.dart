@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../core/constants/app_urls.dart';
 import '../core/theme/hardware_theme.dart';
 import '../services/discovery_service.dart';
 import '../services/haptic_service.dart';
@@ -356,23 +355,30 @@ class _ServerConnectionSheetState extends State<_ServerConnectionSheet> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.wifi_off_rounded, color: Color(0xFF38BDF8), size: 18),
-                          const SizedBox(width: 8),
-                          Text(
-                            "NO NETWORK / DEAD ZONE BUFFER",
-                            style: GoogleFonts.spaceGrotesk(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w900,
-                              color: HardwarePalette.silkscreenDark,
-                              letterSpacing: 0.5,
+                      Expanded(
+                        child: Row(
+                          children: [
+                            const Icon(Icons.wifi_off_rounded, color: Color(0xFF38BDF8), size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                "NO NETWORK / DEAD ZONE BUFFER",
+                                style: GoogleFonts.spaceGrotesk(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w900,
+                                  color: HardwarePalette.silkscreenDark,
+                                  letterSpacing: 0.3,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
+                      const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                         decoration: BoxDecoration(
                           color: SocketService.isGhatModeActive
                               ? const Color(0xFF38BDF8).withOpacity(0.2)
@@ -382,7 +388,7 @@ class _ServerConnectionSheetState extends State<_ServerConnectionSheet> {
                         child: Text(
                           "${SocketService.offlineBufferedCount}/500 SAVED",
                           style: GoogleFonts.jetBrainsMono(
-                            fontSize: 10,
+                            fontSize: 9.5,
                             fontWeight: FontWeight.w900,
                             color: SocketService.isGhatModeActive
                                 ? const Color(0xFF38BDF8)

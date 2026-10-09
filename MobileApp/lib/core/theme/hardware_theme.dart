@@ -32,13 +32,13 @@ abstract class HardwarePalette {
   static const Color terracottaRed   = Color(0xFFE53935); // Signature racing red accent
   static const Color criticalCrimson = Color(0xFFDC2626); // Deep laser crimson
   static const Color criticalRed     = Color(0xFFEF4444); // High-voltage hazard red
-  static const Color signalEmerald   = Color(0xFFE53935); // Vivid automotive red signal accent
-  static const Color neonActiveGreen = Color(0xFFDC2626); // Laser red active indicator
+  static const Color signalEmerald   = Color(0xFF10B981); // Vivid emerald green signal accent
+  static const Color neonActiveGreen = Color(0xFF00E676); // High-visibility laser neon active green
   static const Color hazardGlow      = Color(0xFFFF1744); // Electric neon red glow
   static const Color industrialAmber = Color(0xFFD97706); // Caution amber
   static const Color cautionAmber    = Color(0xFFD97706);
   static const Color cobaltBlue      = Color(0xFF2563EB); // Data link blue
-  static const Color blockitOrange   = Color(0xFFE53935); // Signature red chassis dot accent
+  static const Color blockitOrange   = Color(0xFFFF6D00); // Signature orange chassis dot accent
   static const Color crimsonImpact   = criticalCrimson;
   static const Color amberCaution    = cautionAmber;
 

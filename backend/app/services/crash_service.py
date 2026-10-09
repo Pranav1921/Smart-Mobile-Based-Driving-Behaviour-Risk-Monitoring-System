@@ -4,9 +4,9 @@ class CrashService:
     @staticmethod
     def generate_summary(crash_report_id: str, sensor_values: Dict[str, Any]) -> Dict[str, Any]:
         # G-Force calculations based on sensor acceleration vectors
-        accel_x = abs(float(sensor_values.get("accel_x", 0) or 0))
-        accel_y = abs(float(sensor_values.get("accel_y", 0) or 0))
-        accel_z = abs(float(sensor_values.get("accel_z", 0) or 0))
+        accel_x = abs(float(sensor_values.get("accel_x") or sensor_values.get("accelX") or 0))
+        accel_y = abs(float(sensor_values.get("accel_y") or sensor_values.get("accelY") or 0))
+        accel_z = abs(float(sensor_values.get("accel_z") or sensor_values.get("accelZ") or 0))
         
         # Driver movement context
         speed_before = float(sensor_values.get("speedBefore", 0) or sensor_values.get("speed_before", 0) or 0)
@@ -19,7 +19,7 @@ class CrashService:
         g_force_z = accel_z / 9.80665
         
         # Peak sensor impact ("crush value")
-        max_g = float(sensor_values.get("gForce", 0) or max(g_force_x, g_force_y, g_force_z))
+        max_g = float(sensor_values.get("gForce") or sensor_values.get("g_force") or max(g_force_x, g_force_y, g_force_z))
         if max_g == 0:
             max_g = 1.0
 

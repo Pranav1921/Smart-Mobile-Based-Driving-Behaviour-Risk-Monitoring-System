@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
+import 'dart:typed_data';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -26,6 +28,7 @@ class Esp32DeviceStatus {
   final int harshBrakeCount;
   final int rapidAccelCount;
   final int sharpTurnCount;
+  final bool potholeDetected;
 
   Esp32DeviceStatus({
     required this.isConnected,
@@ -47,6 +50,7 @@ class Esp32DeviceStatus {
     this.harshBrakeCount = 0,
     this.rapidAccelCount = 0,
     this.sharpTurnCount = 0,
+    this.potholeDetected = false,
   });
 
   factory Esp32DeviceStatus.disconnected() => Esp32DeviceStatus(isConnected: false);
@@ -56,7 +60,7 @@ class Esp32DeviceStatus {
       isConnected: true,
       isBle: true,
       deviceId: deviceId,
-      firmwareVersion: '3.0.0-BLE',
+      firmwareVersion: '3.7.0-BLE',
       sensorConnected: (json['sc'] == 1 || json['sc'] == true || json['sensorConnected'] == true),
       ax: (json['ax'] as num?)?.toDouble() ?? 0.0,
       ay: (json['ay'] as num?)?.toDouble() ?? 0.0,
@@ -70,6 +74,47 @@ class Esp32DeviceStatus {
       harshBrakeCount: (json['hb'] as num?)?.toInt() ?? (json['harshBrakeCount'] as num?)?.toInt() ?? 0,
       rapidAccelCount: (json['ra'] as num?)?.toInt() ?? (json['rapidAccelCount'] as num?)?.toInt() ?? 0,
       sharpTurnCount: (json['st'] as num?)?.toInt() ?? (json['sharpTurnCount'] as num?)?.toInt() ?? 0,
+      potholeDetected: (json['ph'] == 1 || json['ph'] == true),
+    );
+  }
+
+  factory Esp32DeviceStatus.fromBinary(List<int> bytes, {String deviceId = 'FG-ESP32-BLE'}) {
+    if (bytes.length < 16 || bytes[0] != 0xAA) {
+      return Esp32DeviceStatus.disconnected();
+    }
+    final byteData = ByteData.sublistView(Uint8List.fromList(bytes));
+    final int rawAx = byteData.getInt16(4, Endian.little);
+    final int rawAy = byteData.getInt16(6, Endian.little);
+    final int rawAz = byteData.getInt16(8, Endian.little);
+    final int rawGz = byteData.getInt16(10, Endian.little);
+    final int flags = bytes[12];
+    final int tempC2 = bytes[13];
+
+    final ax = rawAx / 100.0;
+    final ay = rawAy / 100.0;
+    final az = rawAz / 100.0;
+    final gz = (rawGz / 10.0) * (pi / 180.0);
+    final gMag = sqrt(ax * ax + ay * ay + az * az) / 9.80665;
+
+    return Esp32DeviceStatus(
+      isConnected: true,
+      isBle: true,
+      deviceId: deviceId,
+      firmwareVersion: '3.7.0-BIN',
+      sensorConnected: true,
+      ax: ax,
+      ay: ay,
+      az: az,
+      gx: 0.0,
+      gy: 0.0,
+      gz: gz,
+      temperature: tempC2 / 2.0,
+      gMagnitude: gMag,
+      impactDetected: (flags & 0x01) != 0,
+      harshBrakeCount: (flags & 0x02) != 0 ? 1 : 0,
+      rapidAccelCount: (flags & 0x04) != 0 ? 1 : 0,
+      sharpTurnCount: (flags & 0x08) != 0 ? 1 : 0,
+      potholeDetected: (flags & 0x10) != 0,
     );
   }
 }
@@ -89,6 +134,7 @@ class Esp32Service {
   static StreamSubscription<List<int>>? _telemetrySub;
   static StreamSubscription<BluetoothConnectionState>? _connectionStateSub;
   static BluetoothCharacteristic? _commandChar;
+  static String bleBuffer = "";
 
   static BluetoothDevice? get connectedBleDevice => _connectedBleDevice;
 
@@ -237,9 +283,18 @@ class Esp32Service {
         await telemetryChar.setNotifyValue(true);
 
         _telemetrySub?.cancel();
-        String bleBuffer = "";
         _telemetrySub = telemetryChar.onValueReceived.listen((data) {
           if (data.isNotEmpty) {
+            // 1. Direct Binary Packet Decoding (0xAA header, 16+ bytes)
+            if (data[0] == 0xAA && data.length >= 16) {
+              try {
+                final status = Esp32DeviceStatus.fromBinary(data, deviceId: device.platformName);
+                onTelemetry(status);
+                return;
+              } catch (_) {}
+            }
+
+            // 2. Fallback to Stream JSON Decoding
             try {
               final chunk = utf8.decode(data, allowMalformed: true);
               bleBuffer += chunk;
@@ -305,6 +360,7 @@ class Esp32Service {
       _commandChar = null;
       await _connectionStateSub?.cancel();
       _connectionStateSub = null;
+      bleBuffer = "";
       if (_connectedBleDevice != null) {
         final dev = _connectedBleDevice;
         _connectedBleDevice = null;

@@ -26,11 +26,12 @@
 #define MODE_WIFI_ONLY  3
 
 // >>> SELECT YOUR FIRMWARE MODE HERE <<<
-#define SYSTEM_MODE     MODE_BLE_ONLY
+#define SYSTEM_MODE     MODE_DUAL
 
 #if (SYSTEM_MODE == MODE_DUAL || SYSTEM_MODE == MODE_WIFI_ONLY)
   #include <WiFi.h>
   #include <WebServer.h>
+  #include <Update.h>
 #endif
 
 #include <Wire.h>
@@ -115,6 +116,43 @@ unsigned long lastHarshBrakeEvent = 0;
 unsigned long lastRapidAccelEvent = 0;
 unsigned long lastSharpTurnEvent = 0;
 unsigned long lastImpactEvent = 0;
+unsigned long lastPotholeEvent = 0;
+
+bool potholeDetected = false;
+int potholeCount = 0;
+const float THRESHOLD_POTHOLE_DELTA_Z = 14.0; // Sudden vertical shock (> 1.4G delta on Z)
+uint16_t blePacketSeq = 0;
+
+// 16-byte Compact Binary BLE Packet
+#pragma pack(push, 1)
+struct BleTelemetryPacket {
+  uint8_t header;       // 0xAA
+  uint8_t msgType;      // 0x01 = Telemetry
+  uint16_t seq;         // Sequence counter
+  int16_t ax;           // accelX * 100
+  int16_t ay;           // accelY * 100
+  int16_t az;           // accelZ * 100
+  int16_t gz;           // gyroZ * 10
+  uint8_t flags;        // Bitmask: [0: Impact, 1: Harsh Brake, 2: Rapid Accel, 3: Sharp Turn, 4: Pothole]
+  uint8_t tempC2;       // tempC / 2
+  uint16_t crc;         // CCITT-FALSE CRC-16
+};
+#pragma pack(pop)
+
+uint16_t computeCrc16(const uint8_t* buffer, size_t len) {
+  uint16_t crc = 0xFFFF;
+  for (size_t i = 0; i < len; i++) {
+    crc ^= (uint16_t)buffer[i] << 8;
+    for (uint8_t b = 0; b < 8; b++) {
+      if (crc & 0x8000) {
+        crc = (crc << 1) ^ 0x1021;
+      } else {
+        crc <<= 1;
+      }
+    }
+  }
+  return crc;
+}
 
 unsigned long lastReadTime = 0;
 unsigned long lastBlinkTime = 0;
@@ -331,6 +369,16 @@ void readMPU6050() {
         Serial.printf("[EVENT] 🔄 Sharp Turn Detected! Yaw Rate: %.2f rad/s\n", gz);
       }
     }
+
+    // 5. Road Anomaly (Pothole / Vertical transient shockwave without high yaw or crash)
+    if (abs(deltaAz) >= THRESHOLD_POTHOLE_DELTA_Z && abs(deltaAx) < 8.0 && abs(deltaAy) < 8.0 && abs(gz) < 1.5) {
+      if (now - lastPotholeEvent > 2500) {
+        lastPotholeEvent = now;
+        potholeDetected = true;
+        potholeCount++;
+        Serial.printf("[EVENT] 🕳️ Road Anomaly / Pothole Shock! Vertical Delta: %.2f m/s^2\n", abs(deltaAz));
+      }
+    }
   } else {
     mpuConnected = false;
   }
@@ -526,6 +574,36 @@ void setup() {
   server.on("/api/v1/device/status", HTTP_OPTIONS, handleOptions);
   server.on("/api/v1/telemetry/latest", HTTP_OPTIONS, handleOptions);
   server.on("/api/v1/device/led", HTTP_OPTIONS, handleOptions);
+
+  // OTA Firmware Flashing Handlers
+  server.on("/api/v1/device/ota/upload", HTTP_POST, []() {
+    sendCORSHeaders();
+    bool success = !Update.hasError();
+    server.send(200, "application/json", success ? "{\"status\":\"SUCCESS\",\"message\":\"OTA update completed successfully. Node rebooting...\"}" : "{\"status\":\"FAILED\",\"message\":\"OTA update write failed.\"}");
+    delay(500);
+    if (success) {
+      ESP.restart();
+    }
+  }, []() {
+    HTTPUpload& upload = server.upload();
+    if (upload.status == UPLOAD_FILE_START) {
+      Serial.printf("[OTA] Receiving firmware upload: %s\n", upload.filename.c_str());
+      if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
+        Update.printError(Serial);
+      }
+    } else if (upload.status == UPLOAD_FILE_WRITE) {
+      if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
+        Update.printError(Serial);
+      }
+    } else if (upload.status == UPLOAD_FILE_END) {
+      if (Update.end(true)) {
+        Serial.printf("[OTA] Firmware successfully written: %u bytes.\n", upload.totalSize);
+      } else {
+        Update.printError(Serial);
+      }
+    }
+  });
+  server.on("/api/v1/device/ota/upload", HTTP_OPTIONS, handleOptions);
   server.onNotFound(handleNotFound);
 
   server.begin();
@@ -577,19 +655,38 @@ void loop() {
   // Stream Live Telemetry over BLE Notify at 20 Hz
   if (bleDeviceConnected && (currentMillis - lastBleStreamTime >= 50)) {
     lastBleStreamTime = currentMillis;
+    blePacketSeq++;
 
-    char bleBuf[192];
+    // Prepare 16-byte packed binary packet
+    BleTelemetryPacket pkt;
+    pkt.header = 0xAA;
+    pkt.msgType = 0x01;
+    pkt.seq = blePacketSeq;
+    pkt.ax = (int16_t)(ax * 100);
+    pkt.ay = (int16_t)(ay * 100);
+    pkt.az = (int16_t)(az * 100);
+    pkt.gz = (int16_t)(gz * (180.0 / PI) * 10);
+    pkt.flags = 0;
+    if (impactDetected) pkt.flags |= 0x01;
+    if (harshBrakeCount > 0) pkt.flags |= 0x02;
+    if (rapidAccelCount > 0) pkt.flags |= 0x04;
+    if (sharpTurnCount > 0) pkt.flags |= 0x08;
+    if (potholeDetected) pkt.flags |= 0x10;
+    pkt.tempC2 = (uint8_t)(tempC * 2);
+    pkt.crc = computeCrc16((const uint8_t*)&pkt, sizeof(pkt) - 2);
+
+    // Also prepare full JSON buffer with pothole field for full transparency
+    char bleBuf[220];
     snprintf(bleBuf, sizeof(bleBuf),
-      "{\"ax\":%.2f,\"ay\":%.2f,\"az\":%.2f,\"gx\":%.2f,\"gy\":%.2f,\"gz\":%.2f,\"gMag\":%.2f,\"temp\":%.1f,\"imp\":%d,\"hb\":%d,\"ra\":%d,\"st\":%d,\"sc\":%d}",
-      ax, ay, az, gx, gy, gz, gMagnitude, tempC, impactDetected ? 1 : 0, harshBrakeCount, rapidAccelCount, sharpTurnCount, mpuConnected ? 1 : 0
+      "{\"ax\":%.2f,\"ay\":%.2f,\"az\":%.2f,\"gx\":%.2f,\"gy\":%.2f,\"gz\":%.2f,\"gMag\":%.2f,\"temp\":%.1f,\"imp\":%d,\"hb\":%d,\"ra\":%d,\"st\":%d,\"ph\":%d,\"sc\":%d}",
+      ax, ay, az, gx, gy, gz, gMagnitude, tempC, impactDetected ? 1 : 0, harshBrakeCount, rapidAccelCount, sharpTurnCount, potholeDetected ? 1 : 0, mpuConnected ? 1 : 0
     );
 
     pTxCharacteristic->setValue((uint8_t*)bleBuf, strlen(bleBuf));
     pTxCharacteristic->notify();
 
-    if (impactDetected) {
-      impactDetected = false;
-    }
+    if (impactDetected) impactDetected = false;
+    if (potholeDetected) potholeDetected = false;
   }
 #endif
 

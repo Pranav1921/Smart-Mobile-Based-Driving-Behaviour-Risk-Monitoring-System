@@ -23,7 +23,9 @@ import {
   FileCheck,
   Radio,
   ExternalLink,
-  Sparkles
+  Sparkles,
+  Navigation,
+  Pencil
 } from 'lucide-react'
 import { isDriverInRegion, getActiveAdminRegionId } from '@/lib/regionMatcher'
 import { VehicleSymbol } from '@/components/ui/VehicleSymbol'
@@ -34,9 +36,12 @@ import { seeded, cn } from '@/lib/utils'
 import { useSocket } from '@/hooks/SocketContext'
 import { DriverDetailModal } from '@/components/drivers/DriverDetailModal'
 import { DriverVerificationModal } from '@/components/drivers/DriverVerificationModal'
+import { EditDriverModal } from '@/components/drivers/EditDriverModal'
+import { PartnershipRelayModal } from '@/components/map/PartnershipRelayModal'
 import { Driver } from '@/types'
 import { 
   deleteDriverFromApi, 
+  fetchDriversFromApi,
   fetchPendingDrivers, 
   approveDriverApplication, 
   rejectDriverApplication 
@@ -83,8 +88,13 @@ export default function Drivers() {
   const [q, setQ] = useState('')
   const [sortKey, setSortKey] = useState<'safetyScore' | 'trips' | 'distanceToday'>('safetyScore')
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null)
+  const [editingDriver, setEditingDriver] = useState<Driver | null>(null)
+  const [relayModalDriver, setRelayModalDriver] = useState<Driver | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<Driver | null>(null)
+  const [deleteSuccessToast, setDeleteSuccessToast] = useState<string | null>(null)
   const [isVerificationOpen, setIsVerificationOpen] = useState(false)
+  const [apiDrivers, setApiDrivers] = useState<Driver[]>([])
   
   // Pending Employee Requests state
   const [pendingDrivers, setPendingDrivers] = useState<any[]>([])
@@ -92,6 +102,29 @@ export default function Drivers() {
   const [approvingId, setApprovingId] = useState<string | null>(null)
   const [rejectingId, setRejectingId] = useState<string | null>(null)
   const [approvalAlert, setApprovalAlert] = useState<{ name: string; email: string; driverCode: string; tempPassword: string } | null>(null)
+
+  const { toggleDriverAvailability, toggleDriverDeadZone, sameDirectionSummary } = socket;
+
+  const handleToggleAvailability = (e: React.MouseEvent, driverId: string, current: boolean) => {
+    e.stopPropagation()
+    toggleDriverAvailability(driverId, !current)
+  }
+
+  const handleToggleDeadZone = (e: React.MouseEvent, driverId: string, current: boolean) => {
+    e.stopPropagation()
+    toggleDriverDeadZone(driverId, !current)
+  }
+
+  const loadApiDrivers = async (region?: string) => {
+    try {
+      const list = await fetchDriversFromApi(region !== 'all' ? region : undefined)
+      if (Array.isArray(list)) {
+        setApiDrivers(list)
+      }
+    } catch (err) {
+      console.error('[Drivers] Failed to fetch drivers from DB:', err)
+    }
+  }
 
   const refreshPending = async (region?: string) => {
     setPendingLoading(true)
@@ -106,6 +139,7 @@ export default function Drivers() {
   }
 
   useEffect(() => {
+    loadApiDrivers(selectedRegion)
     refreshPending(selectedRegion)
     const interval = setInterval(() => {
       refreshPending(selectedRegion)
@@ -114,8 +148,24 @@ export default function Drivers() {
   }, [selectedRegion])
 
   const rows = useMemo(() => {
-    const list = (liveDrivers || [])
-      .filter((d) => isDriverInRegion(d, selectedRegion))
+    // 1. Gather all drivers from database first
+    const initialMap = new Map<string, Driver>();
+
+    (apiDrivers || []).forEach((d) => {
+      if (d && isDriverInRegion(d, selectedRegion)) {
+        initialMap.set(d.id, d)
+      }
+    });
+
+    // 2. Merge with live socket telemetry
+    (liveDrivers || []).forEach((d) => {
+      if (d && isDriverInRegion(d, selectedRegion)) {
+        const existing = initialMap.get(d.id)
+        initialMap.set(d.id, existing ? { ...existing, ...d } : d)
+      }
+    });
+
+    const list = Array.from(initialMap.values())
       .filter((d) => d && d.id !== 'agent-x' && d.id !== 'mobile-driver' && d.userId !== 'agent-x' && d.userId !== 'mobile-driver')
       .filter((d) => (((d?.name || '') + (d?.employeeId || '') + (d?.fleet || '')).toLowerCase().includes((q || '').toLowerCase())));
 
@@ -206,13 +256,29 @@ export default function Drivers() {
     return (liveDrivers || []).find((d) => d?.id === selectedDriver.id) || selectedDriver
   }, [liveDrivers, selectedDriver])
 
-  const handleDeleteDriver = async (e: React.MouseEvent, driverId: string) => {
+  const handleDeleteDriver = (e: React.MouseEvent, driver: Driver) => {
     e.stopPropagation()
-    if (!confirm('Are you sure you want to remove this operator from the system?')) return
-    setDeletingId(driverId)
-    await deleteDriverFromApi(driverId)
-    socket.removeDriverLocal(driverId)
-    setDeletingId(null)
+    setDeleteConfirmTarget(driver)
+  }
+
+  const executeDelete = async () => {
+    if (!deleteConfirmTarget) return
+    const targetId = deleteConfirmTarget.id
+    const targetName = (deleteConfirmTarget.name || 'Driver').replace(/\s+applicant/gi, '').trim()
+    setDeletingId(targetId)
+    try {
+      await deleteDriverFromApi(targetId)
+      socket.removeDriverLocal(targetId)
+      setApiDrivers((prev) => prev.filter((d) => d.id !== targetId && d.userId !== targetId))
+      if (selectedDriver?.id === targetId) setSelectedDriver(null)
+      setDeleteSuccessToast(`Operator "${targetName}" was permanently deleted from PostgreSQL database.`)
+      setTimeout(() => setDeleteSuccessToast(null), 4000)
+    } catch (err: any) {
+      alert(`Failed to delete operator from database: ${err?.message || 'Check database connection'}`)
+    } finally {
+      setDeletingId(null)
+      setDeleteConfirmTarget(null)
+    }
   }
 
   const handleInlineApprove = async (driver: any) => {
@@ -445,6 +511,35 @@ export default function Drivers() {
         )}
       </div>
 
+      {/* ── SAME-DIRECTION FLEET CONVOY INTELLIGENCE BANNER ────────────────────── */}
+      {sameDirectionSummary && sameDirectionSummary.count > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="stamped-card relative has-rivets p-4 rounded-2xl border-2 border-cyan-500/40 bg-cyan-950/30 text-cyan-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl"
+        >
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 flex items-center justify-center shrink-0 shadow-md">
+              <Navigation size={20} className="animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-space font-black text-xs uppercase tracking-wider text-cyan-300">
+                  Cooperative Convoy Radar • {sameDirectionSummary.count} Pair(s) Aligned
+                </span>
+                <span className="h-2 w-2 rounded-full bg-cyan-400 animate-ping" />
+              </div>
+              <p className="font-tech text-xs text-cyan-200/80 mt-0.5">
+                Vehicles moving in the same heading corridor within 500m proximity. Peer-to-peer V2V telemetry, hazard relays, and proximity alerts active.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 self-end md:self-auto font-mono text-[10px] font-bold px-3 py-1.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 shrink-0">
+            <span>500M V2V MESH ACTIVE</span>
+          </div>
+        </motion.div>
+      )}
+
       {/* ── TAB 1: ACTIVE FLEET OPERATORS TABLE ────────────────────────────────────────── */}
       {activeTab === 'active' && (
         <div className="stamped-card relative has-rivets rounded-[32px] overflow-hidden">
@@ -460,6 +555,7 @@ export default function Drivers() {
                   <th className="px-8 py-5 border-r border-border">CHASSIS UID</th>
                   <th className="px-8 py-5">OPERATOR</th>
                   <th className="px-8 py-5">TELEMETRY LINK</th>
+                  <th className="px-6 py-5">RESCUE & DEAD ZONE DISPATCH</th>
                   <th 
                     className="px-8 py-5 cursor-pointer hover:text-foreground transition" 
                     onClick={() => setSortKey('safetyScore')}
@@ -476,7 +572,7 @@ export default function Drivers() {
               <tbody className="divide-y divide-border">
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-36 text-center">
+                    <td colSpan={8} className="py-36 text-center">
                       <div className="flex flex-col items-center justify-center opacity-50">
                         <ShieldAlert size={48} className="text-muted-foreground mb-4 animate-pulse" />
                         <p className="font-pixel text-[10px] uppercase tracking-[0.4em] text-muted-foreground">
@@ -567,6 +663,64 @@ export default function Drivers() {
                           </div>
                         </td>
 
+                        {/* Rescue Availability & Dead Zone Dispatch Controls */}
+                        <td className="px-6 py-5" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex flex-col gap-1.5 items-start">
+                            {/* Availability Toggle */}
+                            <motion.button
+                              whileHover={{ scale: 1.03 }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={(e) => handleToggleAvailability(e, d.id, (d as any).isAvailable !== false && (d as any).isAvailableForRescue !== false)}
+                              title="Click to toggle driver standby availability for SOS/Rescue events"
+                              className={cn(
+                                "px-2.5 py-1 rounded-lg border text-[9px] font-space font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer shadow-sm",
+                                (d as any).isAvailable !== false && (d as any).isAvailableForRescue !== false
+                                  ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/25"
+                                  : "bg-slate-800/80 border-slate-700 text-slate-400 hover:bg-slate-700/80"
+                              )}
+                            >
+                              <span className={cn(
+                                "h-2 w-2 rounded-full",
+                                (d as any).isAvailable !== false && (d as any).isAvailableForRescue !== false ? "bg-emerald-400 animate-pulse" : "bg-slate-500"
+                              )} />
+                              <span>{(d as any).isAvailable !== false && (d as any).isAvailableForRescue !== false ? "🟢 RESCUE STANDBY" : "⛔ UNAVAILABLE"}</span>
+                            </motion.button>
+
+                            {/* Dead Zone Mode Toggle */}
+                            <motion.button
+                              whileHover={{ scale: 1.03 }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={(e) => handleToggleDeadZone(e, d.id, Boolean((d as any).isDeadZone))}
+                              title="Click to activate or deactivate Dead Zone P2P Mesh mode for this operator"
+                              className={cn(
+                                "px-2.5 py-1 rounded-lg border text-[9px] font-space font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer shadow-sm",
+                                (d as any).isDeadZone
+                                  ? "bg-cyan-500/25 border-cyan-400 text-cyan-300 shadow-[0_0_10px_rgba(6,182,212,0.3)] animate-pulse"
+                                  : "bg-slate-800/40 border-slate-700 text-slate-400 hover:border-cyan-500/40 hover:text-cyan-400"
+                              )}
+                            >
+                              <Radio size={11} className={cn((d as any).isDeadZone && "animate-spin text-cyan-300")} />
+                              <span>{(d as any).isDeadZone ? "📡 DEAD ZONE ON" : "📡 MESH READY"}</span>
+                            </motion.button>
+
+                            {/* 70/30 Partnership Relay Tactical Map Launch Button */}
+                            <motion.button
+                              whileHover={{ scale: 1.03 }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                localStorage.setItem('smartdrive_open_relay_section', d.id)
+                                window.location.href = `/map?relayDriverId=${d.id}`
+                              }}
+                              title="Open Tactical Map Section & Assign 70/30 Partnership Relay"
+                              className="px-2.5 py-1 rounded-lg border text-[9px] font-space font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer shadow-sm bg-sky-500/15 border-sky-500/40 text-sky-400 hover:bg-sky-500/25"
+                            >
+                              <Navigation size={11} className="text-sky-300" />
+                              <span>🤝 70/30 RELAY MAP</span>
+                            </motion.button>
+                          </div>
+                        </td>
+
                         {/* Stability Score */}
                         <td className="px-8 py-5">
                           <div className="flex items-baseline gap-1">
@@ -585,30 +739,48 @@ export default function Drivers() {
                           <Sparkline data={spark} color="#10b981" height={24} />
                         </td>
 
-                        {/* Telemetry Odometer */}
+                        {/* Telemetry Odometer & Reward Points */}
                         <td className="px-8 py-5 font-tech">
                           <div className="flex flex-col">
                             <span className="font-space font-black text-sm text-foreground">
                               {(d?.distanceToday ?? 0).toFixed(1)} <span className="font-pixel text-[8px] text-muted-foreground">KM</span>
                             </span>
                             <span className="font-pixel text-[8px] text-muted-foreground uppercase mt-0.5">
-                              {d?.trips || 0} SORTIES COMPLETED
+                              {d?.trips || 0} DELIVERIES
+                            </span>
+                            <span className="font-mono text-[10px] text-amber-400 font-bold mt-1 flex items-center gap-1">
+                              ⭐ {((d as any)?.points ?? (d as any)?.xp ?? (d as any)?.totalPoints ?? 0)} PTS
                             </span>
                           </div>
                         </td>
 
-                        {/* Inspection & Delete */}
+                        {/* Inspection, Edit & Delete */}
                         <td className="px-8 py-5 text-right">
                           <div className="inline-flex items-center gap-2">
+                            {/* Edit Button */}
                             <motion.button
                               whileHover={{ scale: 1.08 }}
                               whileTap={{ scale: 0.92 }}
-                              onClick={(e) => handleDeleteDriver(e, d.id)}
-                              disabled={deletingId === d.id}
-                              title="De-register Operator"
-                              className="h-9 w-9 rounded-xl border border-border text-muted-foreground hover:text-rose-500 hover:border-rose-500/50 hover:bg-rose-500/10 transition-all flex items-center justify-center cursor-pointer"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setEditingDriver(d)
+                              }}
+                              title="Edit Operator Profile (Syncs to DB)"
+                              className="h-9 w-9 rounded-xl border border-border text-muted-foreground hover:text-primary hover:border-primary/50 hover:bg-primary/10 transition-all flex items-center justify-center cursor-pointer shadow-sm"
                             >
-                              <Trash2 size={14} />
+                              <Pencil size={13} />
+                            </motion.button>
+
+                            {/* Delete Button */}
+                            <motion.button
+                              whileHover={{ scale: 1.08 }}
+                              whileTap={{ scale: 0.92 }}
+                              onClick={(e) => handleDeleteDriver(e, d)}
+                              disabled={deletingId === d.id}
+                              title="Permanently Delete Operator from Database"
+                              className="h-9 w-9 rounded-xl border border-border text-muted-foreground hover:text-rose-500 hover:border-rose-500/50 hover:bg-rose-500/10 transition-all flex items-center justify-center cursor-pointer shadow-sm"
+                            >
+                              <Trash2 size={13} />
                             </motion.button>
                             
                             <motion.div 
@@ -814,6 +986,96 @@ export default function Drivers() {
         onClose={() => setSelectedDriver(null)} 
       />
 
+      {/* Edit Operator Modal */}
+      <EditDriverModal
+        driver={editingDriver}
+        isOpen={Boolean(editingDriver)}
+        onClose={() => setEditingDriver(null)}
+        onSuccess={(updated) => {
+          setApiDrivers((prev) => prev.map((d) => (d.id === updated.id ? { ...d, ...updated } : d)))
+          if (selectedDriver?.id === updated.id) {
+            setSelectedDriver((prev) => (prev ? { ...prev, ...updated } : null))
+          }
+          loadApiDrivers(selectedRegion)
+        }}
+      />
+
+      {/* Permanent Deletion Confirmation Modal */}
+      {deleteConfirmTarget && (
+        <AnimatePresence>
+          <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="bg-[#0B0F19] text-white p-7 rounded-3xl border-2 border-rose-500/70 shadow-[0_0_60px_rgba(244,63,94,0.35)] max-w-md w-full text-center space-y-5 relative overflow-hidden"
+            >
+              {/* Subtle emergency backdrop glow */}
+              <div className="absolute -top-24 -left-24 w-48 h-48 bg-rose-600/20 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-amber-600/10 rounded-full blur-3xl pointer-events-none" />
+
+              <div className="h-14 w-14 rounded-2xl bg-rose-500/20 border-2 border-rose-500/40 text-rose-400 flex items-center justify-center mx-auto shadow-inner">
+                <Trash2 size={26} className="animate-pulse" />
+              </div>
+
+              <div>
+                <h3 className="text-xl font-black font-space uppercase tracking-tight text-white">
+                  Permanently Delete Operator?
+                </h3>
+                <p className="text-xs text-slate-300 mt-2.5 leading-relaxed font-sans font-normal">
+                  Are you sure you want to permanently delete{' '}
+                  <span className="text-amber-300 font-bold bg-amber-400/15 border border-amber-400/30 px-2 py-0.5 rounded-md">
+                    {(deleteConfirmTarget.name || 'Driver').replace(/\s+applicant/gi, '').trim()}
+                  </span>{' '}
+                  <span className="text-slate-400 font-mono text-[11px]">
+                    ({deleteConfirmTarget.employeeId || deleteConfirmTarget.id.slice(0, 8)})
+                  </span>?
+                </p>
+                <p className="text-[11px] text-rose-300/90 font-medium mt-2 bg-rose-950/40 border border-rose-900/50 p-2.5 rounded-xl">
+                  ⚠️ This action is irreversible. All telemetry history, vehicle assignments, and credentials will be permanently purged from PostgreSQL.
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirmTarget(null)}
+                  disabled={Boolean(deletingId)}
+                  className="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-space font-bold text-xs uppercase tracking-wider transition cursor-pointer disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={executeDelete}
+                  disabled={Boolean(deletingId)}
+                  className="flex-1 py-3 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-space font-black text-xs uppercase tracking-wider transition shadow-lg shadow-rose-600/40 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  <Trash2 size={14} />
+                  <span>{deletingId ? 'Deleting...' : 'Delete from DB'}</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        </AnimatePresence>
+      )}
+
+      {/* Delete Success Toast */}
+      {deleteSuccessToast && (
+        <div className="fixed bottom-6 right-6 z-[1200] max-w-md bg-emerald-950/95 border-2 border-emerald-500 text-white text-xs p-4 rounded-2xl shadow-2xl backdrop-blur-md flex items-center justify-between gap-3 animate-in fade-in slide-in-from-bottom-3">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
+            <span className="font-bold text-emerald-100">{deleteSuccessToast}</span>
+          </div>
+          <button
+            onClick={() => setDeleteSuccessToast(null)}
+            className="text-emerald-400 hover:text-white p-1 text-xs cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Driver MoRTH Sarathi Verification Modal */}
       <DriverVerificationModal 
         isOpen={isVerificationOpen} 
@@ -823,8 +1085,25 @@ export default function Drivers() {
         }}
         onApproved={() => {
           refreshPending()
+          loadApiDrivers(selectedRegion)
         }}
       />
+
+      {/* Full-Screen Visual Tactical Map for Partnership Rescue Handover */}
+      {relayModalDriver && (
+        <PartnershipRelayModal
+          isOpen={!!relayModalDriver}
+          onClose={() => setRelayModalDriver(null)}
+          troubledDriver={relayModalDriver}
+          activeOrder={{
+            orderId: (relayModalDriver as any)?.orderId || 'ORD-RELAY-771',
+            customerName: 'Priority Consignment',
+            items: [(relayModalDriver as any)?.orderItems || 'Express Parcel Delivery'],
+            dropAddress: 'Central Transit Sector, Main Hub',
+            amount: (relayModalDriver as any)?.orderAmount || 150,
+          }}
+        />
+      )}
     </div>
   )
 }

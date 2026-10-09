@@ -51,6 +51,15 @@ interface LiveDriver {
   vehiclePlate?: string;
   alertType?: string;
   sosReason?: string;
+  email?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  familyRelationship?: string;
+  deliveryFrom?: string;
+  deliveryTo?: string;
+  destLat?: number;
+  destLng?: number;
+  [key: string]: any;
 }
 
 export interface LivePothole {
@@ -69,7 +78,7 @@ export interface LivePothole {
 export interface LiveGeofence {
   id: string;
   name: string;
-  type: 'school' | 'market' | 'hospital' | 'curve' | 'construction' | 'custom';
+  type: 'school' | 'market' | 'hospital' | 'curve' | 'construction' | 'deadzone' | 'custom';
   centerLat: number;
   centerLng: number;
   radiusMeters: number;
@@ -130,7 +139,31 @@ const liveGeofences: LiveGeofence[] = [
     regionId: 'puttur_taluk',
     createdAt: new Date().toISOString(),
   },
+  {
+    id: 'geo-deadzone-charmadi',
+    name: 'Charmadi Ghat Cellular Blackout Zone',
+    type: 'deadzone',
+    centerLat: 12.7880,
+    centerLng: 75.2250,
+    radiusMeters: 600,
+    speedLimitKph: 40,
+    color: '#06b6d4',
+    regionId: 'puttur_taluk',
+    createdAt: new Date().toISOString(),
+  },
 ];
+
+export function computeHaversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Earth radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c * 100) / 100;
+}
 
 export class SocketManager {
   private io: Server | null = null;
@@ -147,7 +180,7 @@ export class SocketManager {
       allowEIO3: true, // Enable compatibility with older Socket.IO clients (like Flutter socket_io_client 1.x/2.x)
     });
 
-    // ── Cooperative V2V Proximity Engine (Evaluates approaching fleet vehicles every 3s) ──
+    // ── Cooperative V2V Proximity Engine & Same-Direction Fleet Radar (Every 3s) ──
     const v2vCooldowns = new Map<string, number>();
 
     setInterval(() => {
@@ -158,65 +191,178 @@ export class SocketManager {
         d.driverId !== 'agent-x' && 
         d.driverId !== 'mobile-driver'
       );
-      if (activeDrivers.length < 2) return;
 
-      const now = Date.now();
+      // Track same-direction groupings per driver
+      const sameDirectionMap = new Map<string, any[]>();
+      activeDrivers.forEach(d => {
+        sameDirectionMap.set(d.id || d.driverId, []);
+      });
 
-      for (let i = 0; i < activeDrivers.length; i++) {
-        for (let j = i + 1; j < activeDrivers.length; j++) {
-          const d1 = activeDrivers[i];
-          const d2 = activeDrivers[j];
+      if (activeDrivers.length >= 2) {
+        const now = Date.now();
 
-          const id1 = d1.id || d1.driverId;
-          const id2 = d2.id || d2.driverId;
+        for (let i = 0; i < activeDrivers.length; i++) {
+          for (let j = i + 1; j < activeDrivers.length; j++) {
+            const d1 = activeDrivers[i];
+            const d2 = activeDrivers[j];
 
-          // Skip if same vehicle / driver / phantom
-          if (id1 === id2 || (d1.name && d2.name && d1.name.toLowerCase().trim() === d2.name.toLowerCase().trim())) {
-            continue;
-          }
-          if (id1 === 'agent-x' || id2 === 'agent-x' || id1 === 'mobile-driver' || id2 === 'mobile-driver') {
-            continue;
-          }
+            const id1 = d1.id || d1.driverId;
+            const id2 = d2.id || d2.driverId;
 
-          const distKm = Math.sqrt(
-            Math.pow((d1.latitude - d2.latitude) * 111, 2) +
-            Math.pow((d1.longitude - d2.longitude) * 111 * Math.cos(d1.latitude * Math.PI / 180), 2)
-          );
-
-          // Only alert when two real mobiles get a close connection within 500 meters (0.50 km)
-          if (distKm <= 0.50) {
-            const pairKey = [id1, id2].sort().join(':');
-            if (v2vCooldowns.has(pairKey) && now - v2vCooldowns.get(pairKey)! < 60000) {
-              continue; // 60-second cooldown per vehicle pair to prevent repetitive alert spam
+            // Skip if same vehicle / driver / phantom
+            if (id1 === id2 || (d1.name && d2.name && d1.name.toLowerCase().trim() === d2.name.toLowerCase().trim())) {
+              continue;
             }
-            v2vCooldowns.set(pairKey, now);
+            if (id1 === 'agent-x' || id2 === 'agent-x' || id1 === 'mobile-driver' || id2 === 'mobile-driver') {
+              continue;
+            }
 
-            const warningPayload = {
-              v2vActive: true,
-              distanceMeters: Math.round(distKm * 1000),
-              curveName: 'Approaching Vehicle Proximity Corridor',
-              driver1: { id: id1, name: d1.name, lat: d1.latitude, lng: d1.longitude, speed: d1.speed, heading: d1.heading },
-              driver2: { id: id2, name: d2.name, lat: d2.latitude, lng: d2.longitude, speed: d2.speed, heading: d2.heading },
-              timestamp: new Date().toISOString(),
-            };
+            const distKm = Math.sqrt(
+              Math.pow((d1.latitude - d2.latitude) * 111, 2) +
+              Math.pow((d1.longitude - d2.longitude) * 111 * Math.cos(d1.latitude * Math.PI / 180), 2)
+            );
+            const distMeters = Math.round(distKm * 1000);
 
-            // Notify both drivers via their personal rooms
-            this.io.to(`user:${id1}`).to(`user:${d1.driverId}`).emit('blind_curve_warning', {
-              ...warningPayload,
-              oncomingDriver: d2.name,
-              otherDriverName: d2.name,
-            });
-            this.io.to(`user:${id2}`).to(`user:${d2.driverId}`).emit('blind_curve_warning', {
-              ...warningPayload,
-              oncomingDriver: d1.name,
-              otherDriverName: d1.name,
-            });
+            // Calculate heading difference
+            const h1 = d1.heading ?? 0;
+            const h2 = d2.heading ?? 0;
+            const headingDiff = Math.abs(h1 - h2) % 360;
+            const isSameDirection = (headingDiff <= 45 || headingDiff >= 315);
 
-            // Broadcast V2V cooperative vector ray to admin dashboards for LiveMap
-            this.io.to('dashboards').emit('v2v_proximity_alert', warningPayload);
+            // Compute forward bearing from d1 to d2 to determine who is ahead
+            const dLon = (d2.longitude - d1.longitude) * Math.PI / 180;
+            const lat1Rad = d1.latitude * Math.PI / 180;
+            const lat2Rad = d2.latitude * Math.PI / 180;
+            const y = Math.sin(dLon) * Math.cos(lat2Rad);
+            const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
+            const bearingToD2 = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+            const angleDiff = Math.abs(h1 - bearingToD2) % 360;
+            const isD2Ahead = angleDiff <= 65 || angleDiff >= 295;
+
+            // If same direction (within 5 km corridor), register into same-direction radar
+            if (isSameDirection && distKm <= 5.0) {
+              sameDirectionMap.get(id1)?.push({
+                driverId: id2,
+                driverName: d2.name,
+                vehiclePlate: (d2 as any).vehiclePlate || 'KA-19-PT-2026',
+                speed: d2.speed,
+                heading: d2.heading,
+                distanceMeters: distMeters,
+                isAhead: isD2Ahead,
+                relativePosition: isD2Ahead ? 'AHEAD' : 'BEHIND',
+              });
+
+              sameDirectionMap.get(id2)?.push({
+                driverId: id1,
+                driverName: d1.name,
+                vehiclePlate: (d1 as any).vehiclePlate || 'KA-19-PT-2026',
+                speed: d1.speed,
+                heading: d1.heading,
+                distanceMeters: distMeters,
+                isAhead: !isD2Ahead,
+                relativePosition: !isD2Ahead ? 'AHEAD' : 'BEHIND',
+              });
+            }
+
+            // Trigger close proximity alert when within 500 meters (0.50 km)
+            if (distKm <= 0.50) {
+              const pairKey = [id1, id2].sort().join(':');
+              if (!v2vCooldowns.has(pairKey) || (now - v2vCooldowns.get(pairKey)!) >= 30000) {
+                v2vCooldowns.set(pairKey, now);
+
+                let msgForD1 = '';
+                let msgForD2 = '';
+
+                if (isSameDirection) {
+                  if (isD2Ahead) {
+                    msgForD1 = `Fleet Alert: Driver ${d2.name} is ${distMeters}m ahead moving in the same direction (${Math.round(d2.speed)} km/h). Maintain safe distance.`;
+                    msgForD2 = `Fleet Notice: Driver ${d1.name} is ${distMeters}m behind you in the same corridor (${Math.round(d1.speed)} km/h).`;
+                  } else {
+                    msgForD1 = `Fleet Notice: Driver ${d2.name} is ${distMeters}m behind you in the same corridor (${Math.round(d2.speed)} km/h).`;
+                    msgForD2 = `Fleet Alert: Driver ${d1.name} is ${distMeters}m ahead moving in the same direction (${Math.round(d1.speed)} km/h). Maintain safe distance.`;
+                  }
+                } else {
+                  msgForD1 = `Caution: Approaching oncoming fleet vehicle (${d2.name}) within ${distMeters}m!`;
+                  msgForD2 = `Caution: Approaching oncoming fleet vehicle (${d1.name}) within ${distMeters}m!`;
+                }
+
+                const proximityPayload = {
+                  v2vActive: true,
+                  distanceMeters: distMeters,
+                  isSameDirection,
+                  driver1: { id: id1, name: d1.name, lat: d1.latitude, lng: d1.longitude, speed: d1.speed, heading: d1.heading, isAhead: !isD2Ahead },
+                  driver2: { id: id2, name: d2.name, lat: d2.latitude, lng: d2.longitude, speed: d2.speed, heading: d2.heading, isAhead: isD2Ahead },
+                  timestamp: new Date().toISOString(),
+                };
+
+                // Send tailored directional messages to each driver
+                this.io.to(`user:${id1}`).to(`user:${d1.driverId}`).emit('v2v_proximity_message', {
+                  ...proximityPayload,
+                  otherDriverName: d2.name,
+                  otherDriverId: id2,
+                  otherDriverSpeed: d2.speed,
+                  distanceMeters: distMeters,
+                  isAhead: isD2Ahead,
+                  isSameDirection,
+                  message: msgForD1,
+                });
+
+                this.io.to(`user:${id2}`).to(`user:${d2.driverId}`).emit('v2v_proximity_message', {
+                  ...proximityPayload,
+                  otherDriverName: d1.name,
+                  otherDriverId: id1,
+                  otherDriverSpeed: d1.speed,
+                  distanceMeters: distMeters,
+                  isAhead: !isD2Ahead,
+                  isSameDirection,
+                  message: msgForD2,
+                });
+
+                // Also maintain legacy blind_curve_warning event for full backward compatibility
+                this.io.to(`user:${id1}`).to(`user:${d1.driverId}`).emit('blind_curve_warning', {
+                  ...proximityPayload,
+                  oncomingDriver: d2.name,
+                  otherDriverName: d2.name,
+                  message: msgForD1,
+                });
+                this.io.to(`user:${id2}`).to(`user:${d2.driverId}`).emit('blind_curve_warning', {
+                  ...proximityPayload,
+                  oncomingDriver: d1.name,
+                  otherDriverName: d1.name,
+                  message: msgForD2,
+                });
+
+                // Broadcast V2V cooperative vector ray to admin dashboards
+                this.io.to('dashboards').emit('v2v_proximity_alert', {
+                  ...proximityPayload,
+                  message: isSameDirection 
+                    ? `Fleet convoy proximity (${distMeters}m): ${d1.name} and ${d2.name} in same corridor.`
+                    : `Fleet proximity alert (${distMeters}m): ${d1.name} and ${d2.name} converging.`,
+                });
+              }
+            }
           }
         }
       }
+
+      // Broadcast same-direction convoy list to each driver and admin dashboard
+      sameDirectionMap.forEach((convoyList, driverId) => {
+        this.io?.to(`user:${driverId}`).emit('same_direction_drivers', convoyList);
+      });
+
+      // Also gather all active convoy pairs for the dashboard
+      const allSameDirectionPairs: any[] = [];
+      sameDirectionMap.forEach((list, drvId) => {
+        if (list.length > 0) {
+          allSameDirectionPairs.push({
+            driverId: drvId,
+            driverName: liveDrivers.get(drvId)?.name || drvId,
+            sameDirectionCount: list.length,
+            convoy: list,
+          });
+        }
+      });
+      this.io?.to('dashboards').emit('fleet_same_direction_summary', allSameDirectionPairs);
     }, 3000);
 
     // ── JWT Auth middleware ───────────────────────────────────────────────────
@@ -318,31 +464,15 @@ export class SocketManager {
           }
 
           // Determine effective user ID (allow override for demo/offline drivers)
-          const effectiveUserId = (userId === 'mobile-driver' && (data as any).driverId) 
+          let effectiveUserId = (userId === 'mobile-driver' && (data as any).driverId) 
             ? (data as any).driverId 
             : ((data as any).driverId || userId);
 
-          // Discard phantom dummy updates
+          // If effectiveUserId is mobile-driver or agent-x, assign a valid live driver ID so it's not discarded
           if (!effectiveUserId || effectiveUserId === 'agent-x' || effectiveUserId === 'mobile-driver') {
-            return;
-          }
-
-          // CLEANUP: Purge any lingering phantom entries
-          if (liveDrivers.has('agent-x')) {
-            liveDrivers.delete('agent-x');
-            this.io?.to('dashboards').emit('driver_location_update', {
-              driverId: 'agent-x',
-              status: 'offline',
-              timestamp: new Date().toISOString()
-            });
-          }
-          if (liveDrivers.has('mobile-driver')) {
-            liveDrivers.delete('mobile-driver');
-            this.io?.to('dashboards').emit('driver_location_update', {
-              driverId: 'mobile-driver',
-              status: 'offline',
-              timestamp: new Date().toISOString()
-            });
+            effectiveUserId = (data as any).driverName 
+              ? `DRV-${(data as any).driverName.replace(/[^a-zA-Z0-9]/g, '-').toUpperCase()}` 
+              : 'DRV-PTR-2026-001';
           }
 
           // Store it back in socket data for future reference (like disconnect)
@@ -357,10 +487,15 @@ export class SocketManager {
              }
           }
 
-          // Determine driver status based on speed, but preserve emergency status
+          // Determine driver status based on incoming status or speed, clearing emergency if safe
           const wasOffline = !liveDrivers.has(effectiveUserId) || !liveDrivers.get(effectiveUserId)?.isOnline;
           const existing = liveDrivers.get(effectiveUserId);
-          let status: LiveDriver['status'] = (existing?.status === 'emergency') ? 'emergency' : 'safe';
+          if ((data as any).status === 'safe' && existing) {
+            existing.status = 'safe';
+          }
+          let status: LiveDriver['status'] = ((data as any).status === 'safe')
+            ? 'safe'
+            : ((existing?.status === 'emergency') ? 'emergency' : 'safe');
 
           if (status !== 'emergency') {
             if (data.speed < 1.0) status = 'idle';
@@ -381,6 +516,21 @@ export class SocketManager {
               }
             }
           }
+          // Determine if driver is inside an active cellular dead zone geofence
+          let isInsideDeadZoneGeo = false;
+          for (const geo of liveGeofences) {
+            if (geo.type === 'deadzone') {
+              const dLat = (data.latitude - geo.centerLat) * 111000;
+              const dLng = (data.longitude - geo.centerLng) * 111000 * Math.cos(geo.centerLat * Math.PI / 180);
+              const dist = Math.sqrt(dLat * dLat + dLng * dLng);
+              if (dist <= geo.radiusMeters) {
+                isInsideDeadZoneGeo = true;
+                break;
+              }
+            }
+          }
+          const isDeadZone = isInsideDeadZoneGeo || (data as any).isDeadZone || (existing as any)?.isDeadZone || false;
+
           const locationPayload = {
             driverId: effectiveUserId,
             driverName: driverName,
@@ -394,6 +544,7 @@ export class SocketManager {
             safetyScore: (data as any).safetyScore ?? 100,
             regionId: (data as any).regionId || (data as any).region || (socket.data.user as any)?.zone || existing?.regionId || 'puttur_taluk',
             region: (data as any).region || (data as any).regionId || (socket.data.user as any)?.zone || existing?.region || 'puttur_taluk',
+            isDeadZone,
             accelX: (data as any).accelX,
             accelY: (data as any).accelY,
             accelZ: (data as any).accelZ,
@@ -424,6 +575,23 @@ export class SocketManager {
             timestamp: data.timestamp ?? new Date().toISOString(),
           };
 
+          // If driver just entered a deadzone geofence, trigger alert
+          if (isInsideDeadZoneGeo && !(existing as any)?.isDeadZone) {
+            logger.info(`📡 Driver ${effectiveUserId} ENTERED Dead Zone geofence! Auto-activating dead zone mode.`);
+            this.io?.to('dashboards').emit('driver_deadzone_status', {
+              driverId: effectiveUserId,
+              driverName,
+              isDeadZone: true,
+              reason: 'Entered Cellular Dead Zone / Ghat Blackout Geofence',
+              timestamp: new Date().toISOString(),
+            });
+            socket.emit('driver_deadzone_status', {
+              driverId: effectiveUserId,
+              isDeadZone: true,
+              reason: 'Entered Cellular Dead Zone / Ghat Blackout Geofence',
+            });
+          }
+
           // Update in-memory driver state
           liveDrivers.set(effectiveUserId, {
             ...locationPayload,
@@ -447,6 +615,7 @@ export class SocketManager {
 
           // Broadcast to ALL dashboards room specifically (Ensures admin visibility in demo)
           this.io?.to('dashboards').emit('driver_location_update', locationPayload);
+          this.io?.emit('driver_location_update', locationPayload);
 
           // Also broadcast to the specific org room
           const orgRoom = `org:${organizationId ?? 'demo-org'}`;
@@ -578,6 +747,8 @@ export class SocketManager {
             logger.info(`🟢 Driver ${effectiveUserId} (${driverName}) went LIVE (shift online) in region: ${data.regionId || 'default'}`);
             this.io?.to('dashboards').emit('driver_online', locationPayload);
             this.io?.to('dashboards').emit('driver_location_update', locationPayload);
+            this.io?.emit('driver_online', locationPayload);
+            this.io?.emit('driver_location_update', locationPayload);
             const orgRoom = `org:${organizationId ?? 'demo-org'}`;
             this.io?.to(orgRoom).emit('driver_online', locationPayload);
             this.io?.to(orgRoom).emit('driver_location_update', locationPayload);
@@ -922,15 +1093,18 @@ export class SocketManager {
       });
 
       // ── DRIVER: Safety Confirmation (Driver tapped 'I AM SAFE' or responded to ping) ──
-      socket.on('safety_response', (data: { driverId?: string; driverName?: string; status?: string }) => {
-        const effectiveUserId = (userId === 'mobile-driver' && data?.driverId) ? data.driverId : (data?.driverId || userId);
+      const handleDriverSafetyConfirmed = (data: { driverId?: string; driverName?: string; status?: string; reason?: string }) => {
+        let effectiveUserId = (userId === 'mobile-driver' && data?.driverId) ? data.driverId : (data?.driverId || userId);
+        if (!effectiveUserId || effectiveUserId === 'agent-x' || effectiveUserId === 'mobile-driver') {
+          effectiveUserId = data?.driverName ? `DRV-${data.driverName.replace(/[^a-zA-Z0-9]/g, '-').toUpperCase()}` : 'DRV-PTR-2026-001';
+        }
         logger.info(`✅ [SAFETY CONFIRMED] Driver ${effectiveUserId} responded SAFE.`);
 
         let targetKey = effectiveUserId;
         let existing = liveDrivers.get(targetKey);
         if (!existing) {
           for (const [key, d] of liveDrivers.entries()) {
-            if (key === effectiveUserId || d.driverId === effectiveUserId || d.name === effectiveUserId || (d as any).userId === effectiveUserId) {
+            if (key === effectiveUserId || d.driverId === effectiveUserId || d.name === effectiveUserId || (d as any).userId === effectiveUserId || d.status === 'emergency') {
               targetKey = key;
               existing = d;
               break;
@@ -940,27 +1114,50 @@ export class SocketManager {
 
         if (existing) {
           existing.status = 'safe';
+          existing.alertType = undefined;
+          (existing as any).sosReason = undefined;
+          (existing as any).crashReason = undefined;
           liveDrivers.set(targetKey, existing);
         }
 
+        // Also ensure any driver currently in emergency status is cleared to safe
+        for (const [key, d] of liveDrivers.entries()) {
+          if (d.status === 'emergency') {
+            d.status = 'safe';
+            d.alertType = undefined;
+            (d as any).sosReason = undefined;
+            (d as any).crashReason = undefined;
+            liveDrivers.set(key, d);
+          }
+        }
+
+        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const payload = {
           driverId: targetKey || effectiveUserId,
           targetId: effectiveUserId,
           driverName: data?.driverName || existing?.name || effectiveUserId,
           status: 'safe',
-          regionId: existing?.regionId,
-          region: existing?.region,
+          regionId: existing?.regionId || 'puttur_taluk',
+          region: existing?.region || 'puttur_taluk',
+          time: timeStr,
+          reason: data?.reason || 'Operator clicked I AM SAFE on mobile device',
           timestamp: new Date().toISOString(),
         };
 
         // Notify all dashboards immediately that driver is confirmed safe!
         this.io?.to('dashboards').emit('driver_safety_confirmed', payload);
+        this.io?.emit('driver_safety_confirmed', payload);
         this.io?.to('dashboards').emit('driver_responded', payload);
+        this.io?.emit('driver_responded', payload);
         this.io?.to('dashboards').emit('driver_location_update', {
           ...(existing || {}),
           ...payload,
         });
-      });
+      };
+
+      socket.on('safety_response', handleDriverSafetyConfirmed);
+      socket.on('driver_safety_confirmed', handleDriverSafetyConfirmed);
+      socket.on('driver_safe', handleDriverSafetyConfirmed);
 
       // ── ADMIN: Live Camera Stream Request (Relay to mobile driver) ──────
       socket.on('request_live_cam', (data: { driverId: string; active: boolean }) => {
@@ -1066,9 +1263,56 @@ export class SocketManager {
         deliveryFrom?: string;
         deliveryTo?: string;
         payout?: number;
+        pointsEarned?: number;
+        totalPoints?: number;
+        orderPoints?: number;
+        safetyDrivingPoints?: number;
+        orderId?: string;
       }) => {
-        const effectiveUserId = (userId === 'mobile-driver' && data.driverId) ? data.driverId : userId;
-        logger.info(`[TRIP AUDIT] Received completed trip telemetry for driver ${effectiveUserId} | Safety Score: ${data.safetyScore ?? 100}% | Distance: ${data.distanceKm} KM`);
+        const effectiveUserId = (userId === 'mobile-driver' && data.driverId) ? data.driverId : (data.driverId || userId);
+        logger.info(`[TRIP AUDIT] Received completed trip telemetry for driver ${effectiveUserId} | Safety Score: ${data.safetyScore ?? 100}% | Distance: ${data.distanceKm} KM | Points Earned: ${data.pointsEarned ?? 0} (Order: ${data.orderPoints ?? 0}, Safe Driving: ${data.safetyDrivingPoints ?? 0})`);
+
+        // Update in-memory driver telemetry state
+        const existing = liveDrivers.get(effectiveUserId);
+        if (existing) {
+          if (data.totalPoints !== undefined) {
+            existing.points = data.totalPoints;
+          } else if (data.pointsEarned !== undefined) {
+            existing.points = (existing.points || 0) + data.pointsEarned;
+          }
+          if (data.safetyScore !== undefined) {
+            existing.safetyScore = data.safetyScore;
+          }
+          if (data.payout !== undefined) {
+            existing.earnings = (existing.earnings || 0) + data.payout;
+          }
+          existing.trips = (existing.trips || 0) + 1;
+          liveDrivers.set(effectiveUserId, existing);
+          
+          this.io?.to('dashboards').emit('driver_updated', existing);
+        }
+
+        // Persist points/XP, level, and safety score to Database
+        (async () => {
+          try {
+            const { driverRepository } = await import('../repositories/driver.repository');
+            const d = await driverRepository.findByUserId(effectiveUserId).catch(() => null) 
+                   || await driverRepository.findById(effectiveUserId).catch(() => null);
+            if (d) {
+              const updatedXp = data.totalPoints !== undefined ? data.totalPoints : (d.xp + (data.pointsEarned || 0));
+              const updatedScore = data.safetyScore !== undefined ? Math.round(data.safetyScore) : d.safetyScore;
+              const updatedLevel = Math.max(1, Math.floor(updatedXp / 500) + 1);
+              await driverRepository.update(d.id, {
+                xp: updatedXp,
+                safetyScore: updatedScore,
+                level: updatedLevel,
+              });
+              logger.info(`[TRIP AUDIT] DB Sync: Driver ${d.id} updated -> XP: ${updatedXp} (Lvl ${updatedLevel}) | Safety: ${updatedScore}%`);
+            }
+          } catch (dbErr) {
+            logger.warn(`[TRIP AUDIT] Non-fatal DB driver update skipped: ${dbErr}`);
+          }
+        })();
 
         // Broadcast to all dashboard screens (Drivers, Trips, Reports)
         this.io?.to('dashboards').emit('trip_analysis_received', {
@@ -1214,9 +1458,278 @@ export class SocketManager {
         }
       });
 
+      // ── DRIVER / ADMIN: Single-Click Dead Zone Mode Toggle ───────────────
+      socket.on('driver_toggle_deadzone', (data: { driverId?: string; isDeadZone: boolean; reason?: string }) => {
+        const effectiveUserId = (userId === 'mobile-driver' && data?.driverId) ? data.driverId : (data?.driverId || userId);
+        const existing = liveDrivers.get(effectiveUserId);
+        if (existing) {
+          (existing as any).isDeadZone = data.isDeadZone;
+          liveDrivers.set(effectiveUserId, existing);
+        }
+        const payload = {
+          driverId: effectiveUserId,
+          driverName: existing?.name || effectiveUserId,
+          isDeadZone: data.isDeadZone,
+          reason: data.reason || (data.isDeadZone ? 'Driver activated Dead Zone P2P Mesh Relay' : 'Restored standard uplink'),
+          timestamp: new Date().toISOString(),
+        };
+        logger.info(`📡 [DEAD ZONE TOGGLE] Driver ${effectiveUserId}: isDeadZone=${data.isDeadZone}`);
+        this.io?.to('dashboards').emit('driver_deadzone_status', payload);
+        this.io?.emit('driver_deadzone_status', payload);
+        this.io?.to('dashboards').emit('driver_location_update', {
+          ...(existing || {}),
+          ...payload,
+        });
+      });
 
+      socket.on('admin_toggle_driver_deadzone', (data: { driverId: string; isDeadZone: boolean }) => {
+        const existing = liveDrivers.get(data.driverId);
+        if (existing) {
+          (existing as any).isDeadZone = data.isDeadZone;
+          liveDrivers.set(data.driverId, existing);
+        }
+        const payload = {
+          driverId: data.driverId,
+          driverName: existing?.name || data.driverId,
+          isDeadZone: data.isDeadZone,
+          reason: data.isDeadZone ? 'Admin activated Dead Zone Simulation' : 'Admin deactivated Dead Zone Mode',
+          timestamp: new Date().toISOString(),
+        };
+        logger.info(`📡 [ADMIN DEAD ZONE] Driver ${data.driverId}: isDeadZone=${data.isDeadZone}`);
+        this.io?.to('dashboards').emit('driver_deadzone_status', payload);
+        this.io?.to(`user:${data.driverId}`).emit('driver_deadzone_status', payload);
+        this.io?.emit('driver_deadzone_status', payload);
+        this.io?.to('dashboards').emit('driver_location_update', {
+          ...(existing || {}),
+          ...payload,
+        });
+      });
 
-      // ── DRIVER: No Response to Safety Ping (30s Timer Timeout) ─────────────
+      // ── ADMIN: Declare Driver Availability for SOS & Emergency Rescue ───
+      socket.on('admin_set_driver_availability', (data: { driverId: string; isAvailable: boolean }) => {
+        const existing = liveDrivers.get(data.driverId);
+        if (existing) {
+          (existing as any).isAvailableForRescue = data.isAvailable;
+          liveDrivers.set(data.driverId, existing);
+        }
+        const payload = {
+          driverId: data.driverId,
+          driverName: existing?.name || data.driverId,
+          isAvailableForRescue: data.isAvailable,
+          timestamp: new Date().toISOString(),
+        };
+        logger.info(`🛡️ [DRIVER AVAILABILITY] Driver ${data.driverId} rescue availability set to ${data.isAvailable}`);
+        this.io?.to('dashboards').emit('driver_availability_updated', payload);
+        this.io?.to(`user:${data.driverId}`).emit('driver_availability_updated', payload);
+        this.io?.emit('driver_availability_updated', payload);
+        this.io?.to('dashboards').emit('driver_location_update', {
+          ...(existing || {}),
+          ...payload,
+        });
+      });
+
+      // ── CROSS-DELIVERY HANDOVER (30% / 70% Payout Split) ──────────────────
+      socket.on('initiate_cross_delivery_handover', (data: {
+        orderId: string;
+        troubledDriverId: string;
+        troubledDriverName?: string;
+        pickupAddress: string;
+        dropAddress: string;
+        dropLat: number;
+        dropLng: number;
+        packageItems?: string;
+        totalAmount?: number;
+        reason?: string;
+      }) => {
+        const totalAmount = data.totalAmount && data.totalAmount > 0 ? data.totalAmount : 100;
+        const troubledDriverSplit = Math.round(totalAmount * 0.30); // 30% base compensation for troubled driver
+        const relayDriverSplit = totalAmount - troubledDriverSplit;  // 70% for finishing the drop
+
+        const handoverPayload = {
+          ...data,
+          handoverId: `HND-${Date.now()}`,
+          totalAmount,
+          troubledDriverSplit,
+          relayDriverSplit,
+          splitDescription: '30% Base Compensation / 70% Final Delivery Payout',
+          status: 'PENDING_RELAY',
+          timestamp: new Date().toISOString(),
+        };
+
+        logger.warn(`🤝 [CROSS-DELIVERY INITIATED] Order ${data.orderId} from troubled driver ${data.troubledDriverId}. Payout Split: ₹${troubledDriverSplit} (30%) to original, ₹${relayDriverSplit} (70%) to relay driver.`);
+
+        // Broadcast to all drivers and admin dashboards
+        this.io?.emit('cross_delivery_available', handoverPayload);
+        this.io?.to('dashboards').emit('cross_delivery_available', handoverPayload);
+      });
+
+      socket.on('accept_cross_delivery_handover', (data: {
+        handoverId?: string;
+        orderId: string;
+        relayDriverId: string;
+        relayDriverName: string;
+        troubledDriverId: string;
+        totalAmount: number;
+        troubledDriverSplit: number;
+        relayDriverSplit: number;
+        dropAddress: string;
+        dropLat: number;
+        dropLng: number;
+        packageItems?: string;
+      }) => {
+        logger.info(`🤝 [CROSS-DELIVERY ACCEPTED] Relay driver ${data.relayDriverName} (${data.relayDriverId}) accepted order ${data.orderId} from ${data.troubledDriverId}`);
+
+        const confirmedPayload = {
+          ...data,
+          status: 'HANDOVER_IN_TRANSIT',
+          acceptedAt: new Date().toISOString(),
+        };
+
+        // 1. Credit 30% to troubled driver immediately
+        this.io?.to(`user:${data.troubledDriverId}`).emit('cross_delivery_credited_30', {
+          orderId: data.orderId,
+          amountCredited: data.troubledDriverSplit,
+          relayDriverName: data.relayDriverName,
+          message: `Cross-delivery accepted by ${data.relayDriverName}! ₹${data.troubledDriverSplit} (30% split) has been credited to your account.`,
+        });
+
+        // 2. Assign mission to relay driver with 70% payout
+        this.io?.to(`user:${data.relayDriverId}`).emit('cross_delivery_assigned_70', {
+          orderId: data.orderId,
+          dropAddress: data.dropAddress,
+          dropLat: data.dropLat,
+          dropLng: data.dropLng,
+          packageItems: data.packageItems,
+          amountToEarn: data.relayDriverSplit,
+          troubledDriverId: data.troubledDriverId,
+          message: `Cross-delivery accepted! Deliver to ${data.dropAddress} to earn ₹${data.relayDriverSplit} (70% split).`,
+        });
+
+        // 3. Notify dashboards of confirmed handover
+        this.io?.to('dashboards').emit('cross_delivery_confirmed', confirmedPayload);
+        this.io?.emit('cross_delivery_confirmed', confirmedPayload);
+      });
+
+      // ── ADMIN: Authorize Partnership Relay Mode (70% Relay / 30% Troubled Split) ─
+      socket.on('admin_assign_partnership_relay', (data: {
+        orderId?: string;
+        troubledDriverId: string;
+        troubledDriverName?: string;
+        relayDriverId: string;
+        relayDriverName?: string;
+        pickupAddress?: string;
+        dropAddress?: string;
+        dropLat?: number;
+        dropLng?: number;
+        totalAmount?: number;
+        packageItems?: string;
+        reason?: string;
+      }) => {
+        const totalAmount = data.totalAmount && data.totalAmount > 0 ? data.totalAmount : 150;
+        const troubledDriverSplit = Math.round(totalAmount * 0.30); // 30% base compensation
+        const relayDriverSplit = totalAmount - troubledDriverSplit;  // 70% delivery bonus
+
+        const troubledName = data.troubledDriverName || liveDrivers.get(data.troubledDriverId)?.name || data.troubledDriverId;
+        const relayName = data.relayDriverName || liveDrivers.get(data.relayDriverId)?.name || data.relayDriverId;
+
+        const handoverId = `HND-${Date.now()}`;
+        const relayMission = {
+          orderId: data.orderId || `ORD-${Date.now()}`,
+          handoverId,
+          troubledDriverId: data.troubledDriverId,
+          troubledDriverName: troubledName,
+          relayDriverId: data.relayDriverId,
+          relayDriverName: relayName,
+          pickupAddress: data.pickupAddress || 'Current Distress Vehicle Location',
+          dropAddress: data.dropAddress || 'Consignment Drop Point (Main City Center)',
+          dropLat: data.dropLat ?? 12.7749,
+          dropLng: data.dropLng ?? 75.2023,
+          packageItems: data.packageItems || 'Urgent Consignment Package #771',
+          totalAmount,
+          troubledDriverSplit,
+          relayDriverSplit,
+          payoutSplit: '30% Original Driver / 70% Rescue Relay Driver',
+          status: 'PARTNERSHIP_ASSIGNED',
+          timestamp: new Date().toISOString(),
+        };
+
+        logger.info(`🤝 [PARTNERSHIP RELAY ASSIGNED] Order ${relayMission.orderId}: ₹${troubledDriverSplit} (30%) -> ${troubledName}, ₹${relayDriverSplit} (70%) -> ${relayName}`);
+
+        // 1. Send mission to relay driver with 70% payout
+        const relayPayload = {
+          ...relayMission,
+          message: `🚨 PARTNERSHIP RELAY ASSIGNED: Deliver consignment to ${relayMission.dropAddress} for ₹${relayDriverSplit} (70% split payout). Original driver ${troubledName} receives ₹${troubledDriverSplit} (30% split).`,
+        };
+        this.io?.to(`user:${data.relayDriverId}`)
+          .to(`user:${data.relayDriverName}`)
+          .to('user:mobile-driver')
+          .emit('partnership_relay_assigned', relayPayload);
+        this.io?.emit('partnership_relay_assigned', relayPayload);
+
+        // 2. Notify troubled driver of 30% secured payout
+        const troubledPayload = {
+          ...relayMission,
+          message: `🤝 PARTNERSHIP ACTIVE: Driver ${relayName} has been assigned to complete your delivery. ₹${troubledDriverSplit} (30% base split) is secured in your account.`,
+        };
+        this.io?.to(`user:${data.troubledDriverId}`)
+          .to(`user:${data.troubledDriverName}`)
+          .to('user:mobile-driver')
+          .emit('partnership_relay_initiated', troubledPayload);
+        this.io?.emit('partnership_relay_initiated', troubledPayload);
+
+        // 3. Confirm to dashboards
+        this.io?.to('dashboards').emit('partnership_relay_confirmed', relayMission);
+        this.io?.emit('partnership_relay_confirmed', relayMission);
+        this.io?.to('dashboards').emit('cross_delivery_confirmed', relayMission);
+        this.io?.emit('cross_delivery_confirmed', relayMission);
+      });
+
+      // ── DRIVER: Complete Partnership Relay Delivery ────────────────────────
+      socket.on('partnership_relay_complete', (data: {
+        orderId: string;
+        handoverId?: string;
+        relayDriverId: string;
+        relayDriverName?: string;
+        troubledDriverId?: string;
+        totalAmount?: number;
+        troubledDriverSplit?: number;
+        relayDriverSplit?: number;
+      }) => {
+        const totalAmount = data.totalAmount || 150;
+        const troubledSplit = data.troubledDriverSplit || Math.round(totalAmount * 0.30);
+        const relaySplit = data.relayDriverSplit || (totalAmount - troubledSplit);
+
+        logger.info(`🎉 [PARTNERSHIP RELAY COMPLETED] Order ${data.orderId}: ₹${relaySplit} to relay, ₹${troubledSplit} to original.`);
+
+        const completePayload = {
+          orderId: data.orderId,
+          relayDriverId: data.relayDriverId,
+          relayDriverName: data.relayDriverName,
+          troubledDriverId: data.troubledDriverId,
+          totalAmount,
+          troubledDriverSplit: troubledSplit,
+          relayDriverSplit: relaySplit,
+          status: 'DELIVERED',
+          completedAt: new Date().toISOString(),
+        };
+
+        if (data.troubledDriverId) {
+          this.io?.to(`user:${data.troubledDriverId}`).emit('cross_delivery_credited_30', {
+            orderId: data.orderId,
+            amountCredited: troubledSplit,
+            message: `Delivery successfully completed by relay driver! ₹${troubledSplit} (30% split) has been finalized in your earnings.`,
+          });
+        }
+
+        this.io?.to(`user:${data.relayDriverId}`).emit('partnership_delivery_completed', {
+          orderId: data.orderId,
+          amountEarned: relaySplit,
+          message: `Consignment delivered successfully! ₹${relaySplit} (70% split) added to your wallet.`,
+        });
+
+        this.io?.to('dashboards').emit('partnership_relay_completed', completePayload);
+      });
+
       socket.on('driver_no_response', (data: { driverId?: string; reason?: string }) => {
         const effectiveUserId = data.driverId || userId;
         logger.warn(`⚠️ DRIVER NO RESPONSE to Safety Ping: ${effectiveUserId}`);
@@ -1277,6 +1790,98 @@ export class SocketManager {
         }
       });
 
+      // ── HELPER: Alert nearest drivers to emergency incident within 25 km corridor ──
+      const alertNearbyDriversForEmergency = (
+        troubledDriverId: string,
+        troubledDriverName: string,
+        lat: number,
+        lng: number,
+        alertType: 'CRASH' | 'SOS' | 'IMPACT',
+        reason: string
+      ) => {
+        const nearbyCandidates: Array<{
+          driverId: string;
+          name: string;
+          latitude: number;
+          longitude: number;
+          distanceKm: number;
+          etaMinutes: number;
+          vehiclePlate?: string;
+          status?: string;
+          phone?: string;
+        }> = [];
+
+        for (const [id, driver] of liveDrivers.entries()) {
+          const candId = driver.driverId || driver.id || id;
+          if (candId === troubledDriverId || candId === 'agent-x') continue;
+          if (driver.latitude && driver.longitude && !isNaN(driver.latitude) && !isNaN(driver.longitude)) {
+            const dist = computeHaversineKm(lat, lng, driver.latitude, driver.longitude);
+            if (dist <= 25.0) { // Candidate rescue fleet within 25 km
+              const etaMinutes = Math.max(1, Math.round((dist / 35.0) * 60)); // Avg 35 km/h urban speed
+              nearbyCandidates.push({
+                driverId: candId,
+                name: driver.name || 'Fleet Operator',
+                latitude: driver.latitude,
+                longitude: driver.longitude,
+                distanceKm: dist,
+                etaMinutes,
+                vehiclePlate: (driver as any).vehiclePlate || 'KA-19-PT-2026',
+                status: driver.status || 'active',
+                phone: (driver as any).phone || '+91 94812 55667',
+              });
+            }
+          }
+        }
+
+        // Sort ascending by distance
+        nearbyCandidates.sort((a, b) => a.distanceKm - b.distanceKm);
+
+        logger.info(`🚨 [PROXIMITY RESCUE RADAR] Found ${nearbyCandidates.length} nearby candidate driver(s) within 25km of ${troubledDriverName} (${troubledDriverId})`);
+
+        // Alert candidate drivers directly through their private socket rooms
+        for (const cand of nearbyCandidates) {
+          const alertMsg = {
+            alertId: `EMG-RELAY-${Date.now()}-${cand.driverId}`,
+            troubledDriverId,
+            troubledDriverName,
+            alertType,
+            reason,
+            latitude: lat,
+            longitude: lng,
+            distanceKm: cand.distanceKm,
+            etaMinutes: cand.etaMinutes,
+            message: `🚨 EMERGENCY FLEET ALERT: Nearby driver ${troubledDriverName} reported ${alertType} (${cand.distanceKm.toFixed(1)} km away). Standby for potential consignment handover!`,
+            timestamp: new Date().toISOString(),
+          };
+
+          this.io?.to(`user:${cand.driverId}`).emit('emergency_nearby_driver_alert', alertMsg);
+        }
+
+        // Broadcast to Dashboards with full candidate list for Admin Fullscreen Visual Map
+        this.io?.to('dashboards').emit('nearby_rescue_candidates', {
+          troubledDriverId,
+          troubledDriverName,
+          latitude: lat,
+          longitude: lng,
+          alertType,
+          reason,
+          candidates: nearbyCandidates,
+          timestamp: new Date().toISOString(),
+        });
+
+        // Also emit on general emergency channel for all listeners
+        this.io?.to('dashboards').emit('emergency_nearby_driver_alert', {
+          troubledDriverId,
+          troubledDriverName,
+          alertType,
+          reason,
+          latitude: lat,
+          longitude: lng,
+          candidatesCount: nearbyCandidates.length,
+          timestamp: new Date().toISOString(),
+        });
+      };
+
       // ── DRIVER: Dedicated Manual SOS Panic Alert ───────────────────────────
       const handleDriverSos = async (data: any) => {
         const effectiveUserId = data.driverId || userId;
@@ -1310,21 +1915,25 @@ export class SocketManager {
         const googleMapsLink = `https://maps.google.com/?q=${sosData.latitude},${sosData.longitude}`;
         logger.info(`[SOS PANIC DISPATCH] Emitting SOS Alert for ${sosData.driverName} at ${googleMapsLink}`);
 
-        // Broadcast dedicated sos_alert to all dashboard rooms (NOT crash_alert)
+        // Broadcast dedicated sos_alert to all dashboard rooms
         this.io?.to(orgRoom).to('dashboards').emit('sos_alert', sosData);
         this.io?.emit('sos_alert', sosData);
+
+        // Proximity Radar: Alert nearest drivers to provide support or takeover consignment
+        alertNearbyDriversForEmergency(effectiveUserId, sosData.driverName, sosData.latitude, sosData.longitude, 'SOS', sosData.reason);
       };
 
       socket.on('driver_sos_alert', handleDriverSos);
       socket.on('sos_alert', handleDriverSos);
 
-      // ── DRIVER: crash_detected alias for mobile ────────────────────────────
-      socket.on('crash_detected', async (data: any) => {
+      // ── DRIVER: crash_detected and crash_event handlers ────────────────────
+      const handleCrashEvent = async (data: any) => {
         logger.warn(`🚨 CRASH DETECTED from driver ${data.driverId || userId} (${data.reason || 'Impact'})`);
         const effectiveUserId = data.driverId || userId;
         const existing = liveDrivers.get(effectiveUserId);
         if (existing) {
           existing.status = 'emergency';
+          existing.alertType = 'CRASH';
           liveDrivers.set(effectiveUserId, existing);
         }
 
@@ -1359,6 +1968,57 @@ export class SocketManager {
         });
 
         this.io?.to(orgRoom).to('dashboards').emit('crash_alert', alertData);
+
+        // Proximity Radar: Alert nearest drivers to provide support or takeover consignment
+        alertNearbyDriversForEmergency(effectiveUserId, alertData.driverName, alertData.latitude, alertData.longitude, 'CRASH', alertData.reason);
+      };
+
+      socket.on('crash_detected', handleCrashEvent);
+      socket.on('crash_event', handleCrashEvent);
+
+      // ── DRIVER: Dead Zone Offline Impact Burst Synchronization ────────────
+      socket.on('deadzone_impact_sync', (data: { driverId?: string; impacts: any[] }) => {
+        const effectiveUserId = data.driverId || userId;
+        logger.warn(`📶 [DEAD-ZONE IMPACT BURST] Driver ${effectiveUserId} synced ${data.impacts?.length || 0} offline impact events`);
+
+        const existing = liveDrivers.get(effectiveUserId);
+        if (existing) {
+          existing.status = 'emergency';
+          existing.alertType = 'CRASH';
+          liveDrivers.set(effectiveUserId, existing);
+        }
+
+        const orgRoom = `org:${organizationId ?? 'demo-org'}`;
+        const latestImpact = (data.impacts && data.impacts.length > 0) ? data.impacts[data.impacts.length - 1] : null;
+        const lat = latestImpact?.latitude ?? existing?.latitude ?? 12.7749;
+        const lng = latestImpact?.longitude ?? existing?.longitude ?? 75.2023;
+        const driverName = existing?.name || effectiveUserId;
+
+        const burstData = {
+          driverId: effectiveUserId,
+          driverName,
+          count: data.impacts?.length || 0,
+          impacts: data.impacts || [],
+          latitude: lat,
+          longitude: lng,
+          reason: 'Dead-Zone Reconnect: Buffered Offline Impacts Synchronized',
+          severity: 'CRITICAL',
+          timestamp: new Date().toISOString(),
+        };
+
+        // Notify Dashboards of dead-zone synchronization
+        this.io?.to(orgRoom).to('dashboards').emit('deadzone_impact_synced', burstData);
+        this.io?.to(orgRoom).to('dashboards').emit('crash_alert', burstData);
+
+        // Alert nearest drivers
+        alertNearbyDriversForEmergency(effectiveUserId, driverName, lat, lng, 'IMPACT', 'Dead-Zone Offline Impact Synchronized Upon Reconnection');
+
+        // Confirm back to the driver
+        socket.emit('deadzone_impact_acknowledged', {
+          success: true,
+          count: data.impacts?.length || 0,
+          message: `${data.impacts?.length || 0} offline telemetry impacts securely synchronized with Fleet Command HQ.`,
+        });
       });
 
       // ── DRIVER: Pothole & Road Roughness Detection ────────────────────────
@@ -1448,39 +2108,7 @@ export class SocketManager {
         this.io?.emit('admin_voice_broadcast', payload);
       });
 
-      // ── GEOFENCING: Dynamic Speed Zone Editor ─────────────────────────────
-      socket.on('geofence_create', (data: any) => {
-        const newGeo: LiveGeofence = {
-          id: data.id || `geo-${Date.now()}`,
-          name: data.name || 'Enforced Speed Zone',
-          type: data.type || 'custom',
-          centerLat: data.centerLat ?? data.lat ?? 12.7749,
-          centerLng: data.centerLng ?? data.lng ?? 75.2023,
-          radiusMeters: data.radiusMeters || 300,
-          speedLimitKph: data.speedLimitKph || 30,
-          color: data.color || '#3b82f6',
-          regionId: data.regionId || 'puttur_taluk',
-          createdAt: new Date().toISOString(),
-        };
 
-        liveGeofences.push(newGeo);
-        logger.info(`🌐 [GEOFENCE CREATED] ${newGeo.name} (Limit: ${newGeo.speedLimitKph} km/h, Radius: ${newGeo.radiusMeters}m)`);
-
-        const orgRoom = `org:${organizationId ?? 'demo-org'}`;
-        this.io?.to(orgRoom).to('dashboards').emit('geofence_updated', { action: 'create', geofence: newGeo, all: liveGeofences });
-        this.io?.emit('geofence_updated', { action: 'create', geofence: newGeo, all: liveGeofences });
-      });
-
-      socket.on('geofence_delete', (data: { id: string }) => {
-        const idx = liveGeofences.findIndex(g => g.id === data.id);
-        if (idx >= 0) {
-          const removed = liveGeofences.splice(idx, 1)[0];
-          logger.info(`🗑️ [GEOFENCE DELETED] ${removed.name} (${removed.id})`);
-          const orgRoom = `org:${organizationId ?? 'demo-org'}`;
-          this.io?.to(orgRoom).to('dashboards').emit('geofence_updated', { action: 'delete', id: data.id, all: liveGeofences });
-          this.io?.emit('geofence_updated', { action: 'delete', id: data.id, all: liveGeofences });
-        }
-      });
 
       socket.on('get_geofences', () => {
         socket.emit('geofences_sync', liveGeofences);
@@ -1587,6 +2215,10 @@ export class SocketManager {
     const unique = Array.from(uniqueMap.values());
     if (!organizationId) return unique;
     return unique.filter((d) => d.organizationId === organizationId);
+  }
+
+  getDrivers(organizationId?: string): LiveDriver[] {
+    return this.getLiveDrivers(organizationId);
   }
 
   getIO(): Server | null {

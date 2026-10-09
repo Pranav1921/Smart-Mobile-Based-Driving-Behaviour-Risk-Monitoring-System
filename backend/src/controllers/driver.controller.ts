@@ -34,6 +34,9 @@ export class DriverController {
 
       if (
         req.user?.role !== 'SUPER_ADMIN' &&
+        req.user?.role !== 'FLEET_ADMIN' &&
+        driver.user?.organizationId &&
+        req.user?.organizationId &&
         driver.user.organizationId !== req.user?.organizationId
       ) {
         throw new ForbiddenError('Access Denied');
@@ -120,7 +123,10 @@ export class DriverController {
 
   async getList(req: Request, res: Response, next: NextFunction) {
     try {
-      const orgId = (req.user?.organizationId || (req.query.organizationId as string)) || undefined;
+      const isSuperOrFleetAdmin = req.user?.role === 'SUPER_ADMIN' || req.user?.role === 'FLEET_ADMIN';
+      const orgId = isSuperOrFleetAdmin 
+        ? (req.query.organizationId as string | undefined) 
+        : (req.user?.organizationId || undefined);
       const queryZone = req.query.zone !== undefined ? String(req.query.zone).trim() : undefined;
       let zone: string | undefined = undefined;
       if (queryZone && queryZone.toLowerCase() !== 'all' && queryZone !== '') {
@@ -128,7 +134,7 @@ export class DriverController {
       }
 
       const skip = Number(req.query.skip) || 0;
-      const take = Number(req.query.take) || 50;
+      const take = Number(req.query.take) || 100;
 
       const result = await driverService.getDriversList(orgId, zone, skip, take);
 
@@ -163,7 +169,10 @@ export class DriverController {
             latitude: live.latitude,
             longitude: live.longitude,
             lastSeen: live.lastSeen,
-            isOnline: true
+            isOnline: true,
+            xp: (live.points !== undefined && live.points > 0) ? live.points : d.xp,
+            points: (live.points !== undefined && live.points > 0) ? live.points : d.xp,
+            trips: live.trips ?? (d as any).trips ?? 0,
           };
         }
         return d;
@@ -186,6 +195,9 @@ export class DriverController {
 
       if (
         req.user?.role !== 'SUPER_ADMIN' &&
+        req.user?.role !== 'FLEET_ADMIN' &&
+        driver.user?.organizationId &&
+        req.user?.organizationId &&
         driver.user.organizationId !== req.user?.organizationId
       ) {
         throw new ForbiddenError('Access Denied');

@@ -58,12 +58,45 @@ class NotificationService {
     } catch (_) {}
   }
 
+  static const int activeOrderNotificationId = 7777;
+
   /// Displays an ongoing / high priority notification with active order details
   /// so the driver can pull down Android status bar and view order info while in Google Maps.
   static Future<void> showActiveOrderNotification(DeliveryOrder order) async {
-    final title = "🚚 Active Order: ${order.packageItems}";
-    final body = "Driver: ${order.driverName} (${order.driverPhone})\nDrop: ${order.dropAddress}\nFrom: ${order.pickupAddress}";
-    await showSafetyAlert(title, body, type: 'info');
+    final title = "🚚 Active Mission: Order #${order.id}";
+    final body = "Drop: ${order.dropAddress}\nCustomer: ${order.customerName} (${order.customerPhone})\nOTP: ${order.verificationOtp} • Payout: ₹${order.payoutAmount.toInt()}";
+
+    try {
+      const AndroidNotificationDetails androidPlatformChannelSpecifics = AndroidNotificationDetails(
+        'active_order_channel',
+        'Active Delivery Navigation Order',
+        channelDescription: 'Ongoing active delivery order details during navigation',
+        importance: Importance.max,
+        priority: Priority.high,
+        ongoing: true,
+        autoCancel: false,
+        styleInformation: BigTextStyleInformation(''),
+      );
+
+      const NotificationDetails platformChannelSpecifics =
+          NotificationDetails(android: androidPlatformChannelSpecifics);
+
+      await _notificationsPlugin.show(
+        activeOrderNotificationId,
+        title,
+        body,
+        platformChannelSpecifics,
+      );
+    } catch (_) {
+      await showSafetyAlert(title, body, type: 'info');
+    }
+  }
+
+  /// Clears the ongoing active order notification when delivered or cancelled
+  static Future<void> clearActiveOrderNotification() async {
+    try {
+      await _notificationsPlugin.cancel(activeOrderNotificationId);
+    } catch (_) {}
   }
 
   /// High-priority heads-up notification that drops down directly on top of Google Maps

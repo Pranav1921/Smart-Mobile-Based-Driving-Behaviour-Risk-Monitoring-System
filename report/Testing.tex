@@ -1,0 +1,65 @@
+\chapter{System Testing}
+\label{chap:testing}
+
+\section{Introduction}
+\label{sec:test_intro}
+Testing is the process of identifying possible faults or weaknesses in a system to ensure it functions as expected. It helps verify the correctness of individual components, modules, and the final integrated telematics product. In our project, which monitors driving behavior, detects anomalies, and computes safety scores, testing was performed rigorously across multiple stages. A test is considered successful when it uncovers potential edge cases and verifies system stability under variable real-world conditions.
+
+\section{Types of Testing}
+\label{sec:test_types}
+
+\subsection{Unit Testing}
+Unit testing examined individual software and firmware functions in isolation:
+\begin{itemize}
+    \item \textbf{Firmware I2C Driver:} Verified direct register read and write primitives to the MPU-6050 under 400~kHz Fast Mode.
+    \item \textbf{CRC16 Checksum:} Validated packet integrity generation and polynomial check math.
+    \item \textbf{Spatial Downsampling:} Verified that coordinate changes below 3 meters were properly identified and pruned.
+    \item \textbf{Adaptive EMA Smoothing:} Confirmed dynamic transition of smoothing factor $\alpha$ between cruising ($0.22$) and dynamic jerk ($0.65$) modes.
+\end{itemize}
+
+\subsection{Integration Testing}
+Integration testing verified the seamless communication across architectural tiers:
+\begin{itemize}
+    \item \textbf{Edge-to-Mobile BLE Link:} Validated GATT service discovery and binary telemetry stream decoding.
+    \item \textbf{Mobile-to-Cloud Transmission:} Verified HTTPS batch transmission and offline FIFO buffer synchronization after simulated network disconnection.
+    \item \textbf{Cloud-to-Dashboard WebSocket:} Confirmed instantaneous broadcasting of driver safety score updates to the React 18 HUD.
+\end{itemize}
+
+\subsection{Functional Testing}
+Functional testing validated system compliance against defined functional requirements:
+\begin{itemize}
+    \item \textbf{Harsh Braking Trigger:} Confirmed that decelerations $a_x < -3.8\text{ m/s}^2$ generate a warning event and deduct 2.5\% from the trip score.
+    \item \textbf{Pothole Detection:} Confirmed that vertical shockwaves $|a_z| \ge 1.90g$ exceeding the planar force threshold generate a geotagged hazard alert.
+    \item \textbf{Score Floor:} Verified that a simulated collision impulse ($\Delta V > 35\text{ km/h}$) enforces an immediate score penalty floor of 80\%.
+\end{itemize}
+
+\subsection{System Testing}
+System testing evaluated overall end-to-end performance, responsiveness, and load tolerance under concurrent simulated vehicle streams. Stress tests subjected the FastAPI backend to 1,000 concurrent simulated telemetry streams, verifying zero memory leaks and sub-100ms response times.
+
+\section{Test Cases}
+\label{sec:test_cases}
+Table~\ref{tab:test_cases} summarizes the formal test cases executed to validate system behavior across operational scenarios.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Test Cases for Verification and Validation}
+\label{tab:test_cases}
+\begin{tabularx}{\textwidth}{lp{3.5cm}p{4cm}p{4cm}c}
+\toprule
+\textbf{Test ID} & \textbf{Description} & \textbf{Expected Outcome} & \textbf{Actual Outcome} & \textbf{Result} \\
+\midrule
+TC-01 & User opens mobile app and enables BLE. & ESP32 node discovered and paired within 2 seconds. & Node paired; live telemetry streaming verified. & \textbf{Pass} \\
+\addlinespace
+TC-02 & Vehicle halts at red light for 45s. & 3-meter spatial filter prunes stationary coordinates. & Zero redundant writes logged to PostgreSQL. & \textbf{Pass} \\
+\addlinespace
+TC-03 & Driver executes panic braking ($a_x < -3.8\text{ m/s}^2$). & Harsh event logged; 2.5\% penalty deducted; HUD alert sound. & Event logged in DB; mobile audio alert triggered. & \textbf{Pass} \\
+\addlinespace
+TC-04 & Vehicle encounters 8cm pothole at 35 km/h. & Vertical dominance ratio flags pothole with GPS pin. & Amber pothole pin displayed on fleet GIS map. & \textbf{Pass} \\
+\addlinespace
+TC-05 & Cellular network dead-zone for 3 minutes. & Mobile FIFO buffer retains frames; flushes on reconnect. & All buffered frames synced with zero data loss. & \textbf{Pass} \\
+\addlinespace
+TC-06 & Critical collision simulated ($\Delta V > 35\text{ km/h}$). & Emergency SOS banner flashes on dispatch HUD. & Dispatch modal displays coordinates and phone dialer. & \textbf{Pass} \\
+\bottomrule
+\end{tabularx}
+\end{table}

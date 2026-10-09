@@ -27,7 +27,8 @@ import {
   ShieldAlert, 
   MessageSquare, 
   ExternalLink, 
-  Siren 
+  Siren,
+  ShieldCheck
 } from 'lucide-react'
 
 import { DriverDetailModal } from './components/drivers/DriverDetailModal'
@@ -61,11 +62,18 @@ function AppContent() {
     setBreakdownAlert,
     emitLiveCamRequest,
     liveFrame,
+    driverSafeToast,
+    dismissDriverSafeToast,
+    crossDeliveryOffer,
+    crossDeliveryToast,
+    dismissCrossDeliveryToast,
+    initiateCrossDelivery,
   } = useSocket()
   const [dismissedIncidentId, setDismissedIncidentId] = useState<string | null>(null)
   const [selectedProtocolDriver, setSelectedProtocolDriver] = useState<Driver | null>(null)
   const [decisionToast, setDecisionToast] = useState<{ type: 'approve' | 'reject'; name: string; detail: string } | null>(null)
   const [roadsideToast, setRoadsideToast] = useState<string | null>(null)
+  const [crossDeliveryInitiated, setCrossDeliveryInitiated] = useState(false)
 
   useEffect(() => {
     const handleDecision = (e: any) => {
@@ -234,6 +242,23 @@ function AppContent() {
     }
     if (!target && liveDrivers.length > 0) target = liveDrivers[0]
     setSelectedProtocolDriver(target || null)
+  }
+
+  const handleInitiateCrossDelivery = () => {
+    if (!activeDriverId) return
+    initiateCrossDelivery(activeDriverId, {
+      orderId: matchedDriver?.activeOrder?.orderId || `ORD-${Date.now().toString().slice(-4)}`,
+      troubledDriverName: cleanDriverName,
+      pickupAddress: matchedDriver?.deliveryFrom || 'Puttur Logistics Hub',
+      dropAddress: matchedDriver?.deliveryTo || 'Mangaluru Port Gate 4',
+      dropLat: matchedDriver?.destLat || 12.8700,
+      dropLng: matchedDriver?.destLng || 74.8800,
+      packageItems: matchedDriver?.orderItems || 'Cold Chain Cargo Delivery',
+      totalAmount: 100,
+      reason: isSos ? 'Driver Emergency SOS' : isCrash ? 'Vehicle Collision Impact' : 'Roadside Breakdown Assistance',
+    })
+    setCrossDeliveryInitiated(true)
+    setTimeout(() => setCrossDeliveryInitiated(false), 5000)
   }
 
   const liveSelectedProtocolDriver = useMemo(() => {
@@ -476,6 +501,34 @@ function AppContent() {
             </div>
           )}
 
+          {/* Cross-Delivery Handover System (30% / 70% Revenue Split) */}
+          <div className="mt-2.5 p-2.5 rounded-xl bg-cyan-950/40 border border-cyan-500/40 flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-cyan-300 font-space font-black text-[10px] uppercase tracking-wider">
+                <Truck size={12} className="text-cyan-400" />
+                <span>Cross-Delivery Handover (30% / 70% Split)</span>
+              </div>
+              <span className="font-mono text-[9px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30">
+                ₹30 / ₹70 RELAY
+              </span>
+            </div>
+            <div className="text-[10px] text-cyan-100/90 leading-tight">
+              Order parcel can be relayed to nearest passing driver. 30% base retained by troubled operator, 70% earned by relay driver upon drop.
+            </div>
+            <button
+              onClick={handleInitiateCrossDelivery}
+              disabled={crossDeliveryInitiated}
+              className={`py-2 px-3 rounded-lg font-black text-[10px] uppercase tracking-wider flex items-center justify-center gap-1.5 transition shadow active:scale-95 cursor-pointer ${
+                crossDeliveryInitiated
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-cyan-900/30'
+              }`}
+            >
+              <Truck size={12} />
+              <span>{crossDeliveryInitiated ? '✓ Cross-Delivery Broadcasted to Nearby Fleets' : '🤝 Initiate Cross-Delivery (30% You / 70% Relay)'}</span>
+            </button>
+          </div>
+
           {/* Bottom Control Bar: Confirm Safe vs Protocol */}
           <div className="mt-3 grid grid-cols-2 gap-2">
             <button
@@ -511,9 +564,117 @@ function AppContent() {
       )}
 
       <div>
-        {/* Real-time Notifications: Dead Zone Sync / Driver Online / Job Response / New Onboarding Requests / Candidate Decision */}
-        {(deadZoneToast || driverOnlineToast || jobResponseToast || newRequestToast || decisionToast) && (
-          <div className="fixed top-4 right-4 z-[99998] flex flex-col gap-2.5 max-w-md pointer-events-none">
+        {/* Real-time Notifications: Driver Safe / Dead Zone Sync / Cross-Delivery / Driver Online / Job Response / New Onboarding Requests / Candidate Decision */}
+        {(driverSafeToast || deadZoneToast || driverOnlineToast || jobResponseToast || newRequestToast || decisionToast || crossDeliveryToast) && (
+          <div className="fixed top-5 right-5 z-[99999] flex flex-col gap-3 max-w-lg w-[calc(100vw-2.5rem)] pointer-events-none">
+            {/* 70/30 PARTNERSHIP RELAY ACTIVE NOTIFICATION */}
+            {crossDeliveryToast && (
+              <div className="bg-slate-950/95 border-2 border-cyan-400 text-white p-5 rounded-3xl shadow-[0_0_50px_rgba(6,182,212,0.35),0_20px_40px_rgba(0,0,0,0.85)] backdrop-blur-2xl flex flex-col gap-3 pointer-events-auto transition-all animate-in fade-in slide-in-from-top-4 duration-300">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="relative flex items-center justify-center h-12 w-12 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 text-slate-950 font-black shrink-0 shadow-lg shadow-cyan-500/50 ring-4 ring-cyan-500/20">
+                      <Truck size={24} />
+                      <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-cyan-300 animate-ping" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-400/50 text-[10px] font-black uppercase tracking-widest text-cyan-300">
+                          RELAY MISSION ACTIVE
+                        </span>
+                        <span className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse" />
+                      </div>
+                      <h4 className="font-space font-black text-sm tracking-wide text-white mt-0.5">
+                        {crossDeliveryToast.title}
+                      </h4>
+                    </div>
+                  </div>
+                  <button
+                    onClick={dismissCrossDeliveryToast}
+                    className="text-cyan-400 hover:text-white p-1 rounded-lg hover:bg-cyan-900/50 text-xs shrink-0 cursor-pointer"
+                    title="Dismiss"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="text-xs text-slate-200 font-medium leading-relaxed bg-cyan-950/40 p-3 rounded-xl border border-cyan-500/20">
+                  {crossDeliveryToast.message}
+                </div>
+
+                {/* 70/30 Split Visual Card */}
+                <div className="p-3 rounded-xl bg-gradient-to-r from-amber-950/40 via-slate-900 to-emerald-950/40 border border-slate-800 flex items-center justify-between text-xs font-mono">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-amber-400" />
+                    <span className="text-amber-300 font-bold">30% Base Compensation</span>
+                  </div>
+                  <span className="text-cyan-400 font-black">➔</span>
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                    <span className="text-emerald-300 font-bold">70% Relay Delivery Bounty</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-1 text-[10px] text-cyan-300/80 font-mono">
+                  <span>📡 Both mobile terminals notified & synced</span>
+                  <button
+                    onClick={dismissCrossDeliveryToast}
+                    className="px-3 py-1 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black uppercase text-[10px] tracking-wider transition cursor-pointer shadow-md"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* DRIVER CONFIRMED SAFE NOTIFICATION */}
+            {driverSafeToast && (
+              <div className="bg-slate-950/95 border-2 border-emerald-400 text-white p-5 rounded-3xl shadow-[0_0_50px_rgba(16,185,129,0.4),0_20px_40px_rgba(0,0,0,0.85)] backdrop-blur-2xl flex flex-col gap-3 pointer-events-auto transition-all animate-in fade-in slide-in-from-top-4 duration-300">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="relative flex items-center justify-center h-12 w-12 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 text-slate-950 font-black shrink-0 shadow-lg shadow-emerald-500/50 ring-4 ring-emerald-500/20">
+                      <ShieldCheck size={26} className="animate-pulse" />
+                      <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-emerald-300 animate-ping" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/50 text-[10px] font-black uppercase tracking-widest text-emerald-300">
+                          PROTOCOL RESOLVED · OPERATOR SAFE
+                        </span>
+                        <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                      </div>
+                      <h4 className="font-space font-black text-sm tracking-wide text-white mt-0.5">
+                        <strong className="text-emerald-300">{driverSafeToast.driverName}</strong> is Safe & Secure
+                      </h4>
+                    </div>
+                  </div>
+                  <button
+                    onClick={dismissDriverSafeToast}
+                    className="text-emerald-400 hover:text-white p-1 rounded-lg hover:bg-emerald-900/50 text-xs shrink-0 cursor-pointer"
+                    title="Dismiss"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="text-xs text-emerald-100 font-medium leading-relaxed bg-emerald-950/40 p-3 rounded-xl border border-emerald-500/20">
+                  {driverSafeToast.reason || 'Driver clicked "I AM SAFE" on mobile app. All emergency protocols stood down.'}
+                </div>
+
+                <div className="flex items-center justify-between pt-1 border-t border-emerald-500/20 text-[10px] text-emerald-300/90 font-mono">
+                  <div className="flex items-center gap-2">
+                    <span>⏱ Verified at {driverSafeToast.time}</span>
+                    <span>•</span>
+                    <span>GPS Telemetry Normal</span>
+                  </div>
+                  <button
+                    onClick={dismissDriverSafeToast}
+                    className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black uppercase text-[10px] tracking-wider transition cursor-pointer shadow-md active:scale-95"
+                  >
+                    Acknowledge & Stand Down
+                  </button>
+                </div>
+              </div>
+            )}
             {deadZoneToast && (
               <div className="bg-slate-900/95 border-2 border-cyan-500/80 text-white text-xs p-4 rounded-2xl shadow-2xl backdrop-blur-md flex items-center justify-between gap-4 pointer-events-auto transition-all animate-in fade-in slide-in-from-top-3">
                 <div className="flex items-center gap-3 min-w-0">

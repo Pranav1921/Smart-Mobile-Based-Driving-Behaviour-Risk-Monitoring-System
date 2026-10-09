@@ -435,7 +435,49 @@ class ApiService {
     Map<String, dynamic>? sensorValues,
     dynamic event,
   }) async {
-    return true;
+    final response = await _request("/events", method: "POST", body: {
+      if (tripId != null) "tripId": tripId,
+      "eventType": eventType ?? "HARSH_BRAKING",
+      "severity": severity ?? "MEDIUM",
+      "latitude": latitude ?? 0.0,
+      "longitude": longitude ?? 0.0,
+      if (sensorValues != null) "sensorValues": sensorValues,
+    });
+    return response != null;
+  }
+
+  // Report detected road anomaly (pothole, vertical shockwave)
+  static Future<bool> reportRoadAnomaly({
+    required double latitude,
+    required double longitude,
+    required double zShockG,
+    String? roadName,
+    String? anomalyType,
+  }) async {
+    final response = await _request("/anomalies", method: "POST", body: {
+      "latitude": latitude,
+      "longitude": longitude,
+      "zShockG": zShockG,
+      "roadName": roadName ?? "Transit Corridor",
+      "anomalyType": anomalyType ?? "POTENTIAL_POTHOLE",
+    });
+    return response != null;
+  }
+
+  // Upload synchronized high-frequency event evidence buffer (-5s to +5s)
+  static Future<bool> uploadEventEvidence({
+    String? eventId,
+    required List<Map<String, dynamic>> sensorSeries,
+    int sampleRateHz = 20,
+  }) async {
+    final response = await _request("/anomalies/evidence", method: "POST", body: {
+      "eventId": eventId,
+      "sensorSeries": sensorSeries,
+      "sampleRateHz": sampleRateHz,
+      "windowStart": DateTime.now().subtract(const Duration(seconds: 5)).toIso8601String(),
+      "windowEnd": DateTime.now().add(const Duration(seconds: 5)).toIso8601String(),
+    });
+    return response != null;
   }
 
   // Fetch pending delivery orders

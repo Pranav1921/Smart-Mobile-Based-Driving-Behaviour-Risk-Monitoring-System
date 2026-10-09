@@ -1,0 +1,41 @@
+\chapter{Conclusion and Future Scope}
+\label{chap:conclusion}
+
+\section{Summary of Deliverables and Achievements}
+\label{sec:conclusion_summary}
+This major project successfully designed, prototyped, and evaluated the \textbf{Smart Driving Behaviour Analysis System}, an end-to-end AIoT telematics platform for driver safety scoring, anomaly detection, and fleet risk monitoring. By bridging the gap between expensive, proprietary OBD-II systems and unreliable, error-prone smartphone-only apps, the project achieved a cost-effective, high-fidelity solution for vehicular telematics.
+
+The key engineering achievements and deliverables of this project include:
+\begin{enumerate}
+    \item \textbf{Rigid Edge Hardware Node:} Successfully integrated an ESP32 dual-core microcontroller with an InvenSense MPU-6050 6-axis MEMS IMU, mechanically secured to the vehicle chassis. By configuring low-level I2C registers to an unlocked $\pm 16g$ full-scale range and setting a 44~Hz onboard digital low-pass filter, the hardware captures uncontaminated vehicle kinematics at 20~Hz, eliminating the $2.0g - 3.5g$ false positive acceleration spikes caused by loose smartphone movement in cabin holders.
+    \item \textbf{High-Efficiency BLE Telemetry Protocol:} Formulated a 20-byte packed binary telemetry frame transmitted over a custom Bluetooth Low Energy (BLE) GATT service with CRC16 verification, delivering an edge-to-mobile latency of less than 15~ms.
+    \item \textbf{Adaptive Digital Signal Filtering:} Developed an Adaptive Exponential Moving Average (EMA) filter with dynamic smoothing coefficient switching ($\alpha = 0.22$ during steady cruising and $\alpha = 0.65$ upon high jerk detection), coupled with a $0.06g$ deadband threshold to suppress engine acoustic noise while preserving sudden maneuver peaks.
+    \item \textbf{Machine Learning Classification Pipeline:} Extracted 16-dimensional kinematic feature vectors from 2.0-second sliding windows and trained supervised classifiers. The Random Forest ensemble achieved a 94.8\% overall classification accuracy and an F1-score of 0.94 across four maneuver classes (Normal Cruising, Harsh Braking, Rapid Acceleration, and Aggressive Swerving).
+    \item \textbf{Mathematical Safety Scoring Engine:} Formulated an objective, distance-normalized safety scoring model with exponential tolerance decay penalties and a collision impulse ($\Delta V$) floor, categorizing trips into five intuitive operational risk tiers.
+    \item \textbf{Tactical Web Command HUD:} Built an interactive, dark-themed operations dashboard using React 18, Vite, and Leaflet OpenStreetMap GIS, rendering real-time vehicle positions with dynamic compass heading rotations, color-coded trajectory breadcrumbs, and automated emergency SOS dispatch modals.
+    \item \textbf{Network and Storage Optimization:} Implemented a 3-meter spatial displacement filter on the mobile gateway, reducing redundant stationary telemetry writes to PostgreSQL by over 62.4\% during city driving.
+\end{enumerate}
+
+\section{Current Limitations}
+\label{sec:limitations}
+While the experimental results validate the efficacy of the platform, several technical constraints have been identified:
+\begin{enumerate}
+    \item \textbf{Cellular Connectivity Dependency:} Although the mobile client maintains an offline FIFO ring buffer to prevent data loss in network dead zones, real-time fleet tracking and emergency SOS dispatch to remote operators depend on active 4G/5G cellular coverage.
+    \item \textbf{Environmental Pavement Sensitivity:} While the vertical dominance ratio successfully isolates potholes on paved asphalt, continuous driving on unpaved gravel or cobblestone roads generates widespread vertical noise, which can occasionally degrade scoring metrics if road classification metadata is unavailable.
+    \item \textbf{Lack of Visual Driver State Context:} The current system infers driver distraction solely from phone movement and kinematic anomalies. It lacks visual confirmation of driver gaze, eye closure (drowsiness), or physical phone handling at the steering wheel.
+\end{enumerate}
+
+\section{Future Scope and Enhancements}
+\label{sec:future_scope}
+To further advance the capabilities of the Smart Driving Behaviour Analysis System, future research and development will explore three primary enhancements:
+
+\begin{enumerate}
+    \item \textbf{Edge-AI and TinyML Deployment:}
+    Future iterations will port the machine learning classification pipeline directly onto the ESP32 microcontroller using TensorFlow Lite for Microcontrollers (TFLM). By executing quantized neural networks (INT8) on-chip, the edge node can perform maneuver classification locally, transmitting only sparse high-level event tags rather than continuous high-frequency raw telemetry, reducing BLE bandwidth and mobile power consumption.
+    
+    \item \textbf{Computer Vision ADAS Sensor Fusion:}
+    Integrating a forward-facing monocular camera (via a mobile dashcam mount or an ESP32-CAM module) will enable multi-modal sensor fusion. Using lightweight convolutional neural networks (such as YOLOv8-nano or MobileNetV4), the system can measure forward following distance (headway time-to-collision, TTC), detect unintended lane departures, and monitor driver attentiveness (blinking rate and head pose) to complement inertial kinematics.
+    
+    \item \textbf{Decentralized Usage-Based Insurance (UBI) Contracts:}
+    The tamper-proof trip summaries and calculated safety scores can be anchored to a distributed blockchain ledger. Smart contracts could automate weekly insurance premium rebates for drivers maintaining a Gold safety tier ($>95\%$), establishing a transparent, decentralized, and fraud-resistant framework for commercial vehicular insurance.
+\end{enumerate}

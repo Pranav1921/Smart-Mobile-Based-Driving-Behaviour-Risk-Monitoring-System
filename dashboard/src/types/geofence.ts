@@ -1,7 +1,7 @@
 export interface GeofenceZone {
   id: string;
   name: string;
-  type: 'school' | 'market' | 'hospital' | 'curve' | 'construction' | 'custom';
+  type: 'school' | 'market' | 'hospital' | 'curve' | 'construction' | 'deadzone' | 'custom';
   centerLat: number;
   centerLng: number;
   radiusMeters: number;
@@ -19,6 +19,14 @@ export const GEOFENCE_PRESETS: {
   color: string;
   iconName: string;
 }[] = [
+  {
+    type: 'deadzone',
+    label: 'Cellular Dead Zone / Ghat Blackout',
+    defaultRadius: 600,
+    defaultSpeedLimit: 40,
+    color: '#06b6d4',
+    iconName: 'Radio',
+  },
   {
     type: 'school',
     label: 'School / Campus Zone',

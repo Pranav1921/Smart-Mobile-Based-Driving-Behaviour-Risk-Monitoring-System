@@ -24,15 +24,6 @@ export class DriverService {
     return driver;
   }
 
-  async updateProfile(driverId: string, data: any) {
-    const driver = await driverRepository.findById(driverId);
-    if (!driver) {
-      throw new NotFoundError('Driver profile not found');
-    }
-
-    return driverRepository.update(driverId, data);
-  }
-
   async assignVehicle(driverId: string, vehicleId: string) {
     const driver = await driverRepository.findById(driverId);
     if (!driver) {
@@ -60,18 +51,53 @@ export class DriverService {
     return driverRepository.getScoresTrend(driverId, limit);
   }
 
-  async getDriversList(organizationId?: string | null, zone?: string | null, skip = 0, take = 50) {
+  async getDriversList(organizationId?: string | null, zone?: string | null, skip = 0, take = 100) {
     const where: any = {};
-    if (organizationId) where.user = { ...where.user, organizationId };
-    if (zone && zone.trim() !== '' && zone.toLowerCase() !== 'all') {
-      const cleanZone = zone.replace(/(_hq|_hub|_taluk|_zone|_city)/gi, ' ').trim();
+    if (organizationId) {
       where.user = {
         ...where.user,
         OR: [
-          { zone: { contains: zone.trim(), mode: 'insensitive' } },
-          { zone: { contains: cleanZone, mode: 'insensitive' } },
+          { organizationId },
+          { organizationId: null },
         ],
       };
+    }
+
+    if (zone && zone.trim() !== '' && zone.toLowerCase() !== 'all') {
+      const cleanZone = zone.replace(/(_hq|_hub|_taluk|_zone|_city)/gi, ' ').trim();
+      const tokens = cleanZone
+        .split(/[,_\s]+/)
+        .map(t => t.trim())
+        .filter(t => t.length >= 2);
+
+      const zoneConditions: any[] = [
+        { zone: { contains: zone.trim(), mode: 'insensitive' } },
+        { zone: { contains: cleanZone, mode: 'insensitive' } },
+      ];
+
+      for (const tok of tokens) {
+        zoneConditions.push({ zone: { contains: tok, mode: 'insensitive' } });
+      }
+
+      const lower = cleanZone.toLowerCase();
+      if (lower.includes('dakshina') || lower.includes('karnataka')) {
+        ['puttur', 'kadaba', 'mangaluru', 'mangalore', 'bantwal', 'sullia', 'belthangady', 'udupi'].forEach(taluk => {
+          zoneConditions.push({ zone: { contains: taluk, mode: 'insensitive' } });
+        });
+      }
+
+      if (where.user?.OR) {
+        where.AND = [
+          { user: { OR: where.user.OR } },
+          { user: { OR: zoneConditions } },
+        ];
+        delete where.user;
+      } else {
+        where.user = {
+          ...where.user,
+          OR: zoneConditions,
+        };
+      }
     }
 
     const drivers = await driverRepository.findMany({
@@ -90,7 +116,91 @@ export class DriverService {
       throw new NotFoundError('Driver profile not found');
     }
 
-    return driverRepository.delete(driverId);
+    return driverRepository.delete(driver.id);
+  }
+
+  async updateProfile(driverId: string, data: any) {
+    const driver = await driverRepository.findById(driverId);
+    if (!driver) {
+      throw new NotFoundError('Driver profile not found');
+    }
+
+    // 1. Update linked User fields if provided
+    const userUpdates: any = {};
+    if (data.firstName !== undefined) userUpdates.firstName = data.firstName;
+    if (data.lastName !== undefined) userUpdates.lastName = data.lastName;
+    if (data.name !== undefined && data.name.trim()) {
+      const parts = data.name.trim().split(/\s+/);
+      userUpdates.firstName = parts[0] || 'Driver';
+      userUpdates.lastName = parts.slice(1).join(' ') || '';
+    }
+    if (data.phoneNumber !== undefined) userUpdates.phoneNumber = data.phoneNumber;
+    if (data.email !== undefined) userUpdates.email = data.email;
+    if (data.zone !== undefined) userUpdates.zone = data.zone;
+    if (data.region !== undefined && !data.zone) userUpdates.zone = data.region;
+
+    if (Object.keys(userUpdates).length > 0 && driver.userId) {
+      await prisma.user.update({
+        where: { id: driver.userId },
+        data: userUpdates,
+      }).catch(err => logger.warn('[DriverService] User record update warning:', err));
+    }
+
+    // 2. Update Driver fields
+    const driverUpdates: any = {};
+    if (data.licenseNumber !== undefined) driverUpdates.licenseNumber = data.licenseNumber;
+    if (data.licenseExpiry !== undefined) driverUpdates.licenseExpiry = new Date(data.licenseExpiry);
+    if (data.emergencyContactName !== undefined) driverUpdates.emergencyContactName = data.emergencyContactName;
+    if (data.emergencyContactPhone !== undefined) driverUpdates.emergencyContactPhone = data.emergencyContactPhone;
+    if (data.status !== undefined) driverUpdates.status = data.status.toUpperCase();
+    if (data.driverType !== undefined) driverUpdates.driverType = data.driverType;
+    if (data.safetyScore !== undefined) driverUpdates.safetyScore = Number(data.safetyScore);
+
+    // Update custom vehicle / badge metadata if passed
+    if (data.vehicleName || data.vehiclePlate || data.vehicleType) {
+      const existingBadges: string[] = driver.badges || [];
+      const filtered = existingBadges.filter((b: string) => 
+        !b.startsWith('applied_vehicle_name:') && 
+        !b.startsWith('applied_vehicle_plate:') && 
+        !b.startsWith('applied_vehicle:')
+      );
+      if (data.vehicleName) filtered.push(`applied_vehicle_name:${data.vehicleName}`);
+      if (data.vehiclePlate) filtered.push(`applied_vehicle_plate:${data.vehiclePlate}`);
+      if (data.vehicleType) filtered.push(`applied_vehicle:${data.vehicleType}`);
+      driverUpdates.badges = filtered;
+    }
+
+    if (Object.keys(driverUpdates).length > 0) {
+      await driverRepository.update(driver.id, driverUpdates);
+    }
+
+    // 3. Broadcast update to active dashboards and update live socket memory
+    try {
+      const { socketManager } = await import('../sockets/socket.manager');
+      const fullName = `${userUpdates.firstName || driver.user?.firstName || ''} ${userUpdates.lastName || driver.user?.lastName || ''}`.trim() || data.name || driver.user?.firstName || 'Driver';
+      
+      const liveDriver = (socketManager.getDrivers() as any[]).find((d: any) => d.id === driver.id || d.id === driver.userId || d.driverId === driver.id || d.driverId === driver.userId);
+      if (liveDriver) {
+        liveDriver.name = fullName;
+        if (userUpdates.phoneNumber) liveDriver.phoneNumber = userUpdates.phoneNumber;
+        if (userUpdates.zone) liveDriver.zone = userUpdates.zone;
+        if (data.vehiclePlate) liveDriver.vehiclePlateNumber = data.vehiclePlate;
+        if (data.status) liveDriver.status = data.status.toLowerCase();
+      }
+
+      socketManager.getIO()?.emit('driver_profile_updated', {
+        driverId: driver.id,
+        userId: driver.userId,
+        name: fullName,
+        ...userUpdates,
+        ...driverUpdates,
+        vehicleName: data.vehicleName,
+        vehiclePlate: data.vehiclePlate,
+        vehicleType: data.vehicleType,
+      });
+    } catch (_) {}
+
+    return driverRepository.findById(driver.id);
   }
 
   async getPendingApplications(zone?: string | null) {
@@ -200,7 +310,7 @@ export class DriverService {
   }
 
   async approveDriverApplication(driverId: string) {
-    let driver = await driverRepository.findById(driverId);
+    let driver: any = await driverRepository.findById(driverId);
     if (!driver) {
       driver = await driverRepository.findByUserId(driverId);
     }
@@ -233,9 +343,9 @@ export class DriverService {
     await userRepository.update(driver.user.id, { passwordHash });
 
     // Update driver record: mark ACTIVE and attach driver_code and must_change_password badges
-    const existingBadges = driver.badges || [];
+    const existingBadges: string[] = (driver.badges as string[]) || [];
     const updatedBadges = [
-      ...existingBadges.filter(b => !b.startsWith('driver_code:') && b !== 'must_change_password'),
+      ...existingBadges.filter((b: string) => !b.startsWith('driver_code:') && b !== 'must_change_password'),
       `driver_code:${driverCode}`,
       'must_change_password',
       'parivahan_verified',
@@ -247,9 +357,9 @@ export class DriverService {
     });
 
     // Auto-create and assign registered fleet vehicle
-    const appliedVehicleType = driver.badges?.find(b => b.startsWith('applied_vehicle:'))?.replace('applied_vehicle:', '') || 'Truck';
-    const appliedVehicleName = driver.badges?.find(b => b.startsWith('applied_vehicle_name:'))?.replace('applied_vehicle_name:', '') || 'Tata Ace Gold EV';
-    const appliedVehiclePlate = (driver.badges?.find(b => b.startsWith('applied_vehicle_plate:'))?.replace('applied_vehicle_plate:', '') || `KA-19-PT-${randomSeq}`).toUpperCase();
+    const appliedVehicleType = existingBadges.find((b: string) => b.startsWith('applied_vehicle:'))?.replace('applied_vehicle:', '') || 'Truck';
+    const appliedVehicleName = existingBadges.find((b: string) => b.startsWith('applied_vehicle_name:'))?.replace('applied_vehicle_name:', '') || 'Tata Ace Gold EV';
+    const appliedVehiclePlate = (existingBadges.find((b: string) => b.startsWith('applied_vehicle_plate:'))?.replace('applied_vehicle_plate:', '') || `KA-19-PT-${randomSeq}`).toUpperCase();
 
     try {
       let vehicle = await prisma.vehicle.findUnique({

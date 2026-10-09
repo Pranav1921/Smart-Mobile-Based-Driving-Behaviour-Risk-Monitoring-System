@@ -408,11 +408,15 @@ class _RoadsideBreakdownSheetState extends State<_RoadsideBreakdownSheet> {
                                           ),
                                         ),
                                         const SizedBox(width: 6),
-                                        Text(
-                                          "(${op['type']})",
-                                          style: GoogleFonts.spaceGrotesk(
-                                            fontSize: 9,
-                                            color: HardwarePalette.silkscreenSubtle,
+                                        Flexible(
+                                          child: Text(
+                                            "(${op['type']})",
+                                            style: GoogleFonts.spaceGrotesk(
+                                              fontSize: 9,
+                                              color: HardwarePalette.silkscreenSubtle,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
                                           ),
                                         ),
                                       ],

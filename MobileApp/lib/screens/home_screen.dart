@@ -59,66 +59,276 @@ class _HomeScreenState extends State<HomeScreen> {
               _buildSkeuomorphicHeader(p, trip, sensor),
               const SizedBox(height: 12),
 
-              // ── NO NETWORK / DEAD ZONE OFFLINE TELEMETRY BANNER ──
-              if (SocketService.isGhatModeActive || !SocketService.isConnected) ...[
-                GestureDetector(
-                  onTap: () => ServerConnectionModal.show(context),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0F172A),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFF38BDF8), width: 1.2),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF38BDF8).withOpacity(0.15),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
+              // ── DIRECTIONAL V2V / DRIVER AHEAD PROXIMITY ALERT BANNER ──
+              if (trip.v2vAheadAlertMessage != null) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF7C2D12), Color(0xFFB45309)],
                     ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.wifi_off_rounded, color: Color(0xFF38BDF8), size: 20),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFFDE68A), width: 1.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.orange.withOpacity(0.4),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 24),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "V2V PROXIMITY RADAR • FLEET AHEAD",
+                              style: GoogleFonts.spaceGrotesk(
+                                color: const Color(0xFFFDE68A),
+                                fontWeight: FontWeight.w900,
+                                fontSize: 10.5,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              trip.v2vAheadAlertMessage!,
+                              style: GoogleFonts.spaceGrotesk(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+
+              // ── CROSS-DELIVERY RESCUE OFFER MODAL (30% / 70% SPLIT) ──
+              if (trip.pendingCrossDeliveryOffer != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E1B4B),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFF818CF8), width: 1.8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF6366F1).withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF6366F1).withOpacity(0.2),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.handshake_rounded, color: Color(0xFFA5B4FC), size: 18),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              "CROSS-DELIVERY RELAY OPPORTUNITY",
+                              style: GoogleFonts.spaceGrotesk(
+                                color: const Color(0xFFA5B4FC),
+                                fontWeight: FontWeight.w900,
+                                fontSize: 11,
+                                letterSpacing: 0.5,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        "Driver ${trip.pendingCrossDeliveryOffer!['troubledDriverName'] ?? 'Operator'} encountered an incident. Take over parcel delivery to destination?",
+                        style: GoogleFonts.spaceGrotesk(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12.5,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.white12),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            Column(
+                              children: [
+                                Text("ORIGINAL DRIVER (30%)", style: GoogleFonts.spaceGrotesk(color: Colors.white60, fontSize: 9)),
+                                Text("₹${trip.pendingCrossDeliveryOffer!['troubledDriverSplit'] ?? 30}", style: GoogleFonts.spaceGrotesk(color: Colors.amberAccent, fontSize: 15, fontWeight: FontWeight.w900)),
+                              ],
+                            ),
+                            const Text("➔", style: TextStyle(color: Colors.white54, fontSize: 16)),
+                            Column(
+                              children: [
+                                Text("YOUR REWARD (70%)", style: GoogleFonts.spaceGrotesk(color: Colors.white60, fontSize: 9)),
+                                Text("₹${trip.pendingCrossDeliveryOffer!['relayDriverSplit'] ?? 70}", style: GoogleFonts.spaceGrotesk(color: const Color(0xFF34D399), fontSize: 16, fontWeight: FontWeight.w900)),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        "📍 Drop: ${trip.pendingCrossDeliveryOffer!['dropAddress'] ?? 'Customer Destination'}",
+                        style: GoogleFonts.spaceGrotesk(color: Colors.white70, fontSize: 11),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: Colors.white30),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              onPressed: () => trip.dismissCrossDeliveryOffer(),
+                              child: Text("DISMISS", style: GoogleFonts.spaceGrotesk(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w700)),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            flex: 2,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF10B981),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              onPressed: () => trip.acceptCrossDeliveryOffer(trip.pendingCrossDeliveryOffer!),
+                              child: Text("ACCEPT (EARN 70%)", style: GoogleFonts.spaceGrotesk(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+
+              // ── SAME-DIRECTION FLEET CONVOY TRAFFIC RADAR ──
+              if (trip.sameDirectionDrivers.isNotEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: HardwarePalette.milledSurface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFF10B981).withOpacity(0.4)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.alt_route_rounded, color: Color(0xFF10B981), size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              "SAME-DIRECTION FLEET CONVOY (${trip.sameDirectionDrivers.length} VEHICLES)",
+                              style: GoogleFonts.spaceGrotesk(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w900,
+                                color: const Color(0xFF10B981),
+                                letterSpacing: 0.5,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      ...trip.sameDirectionDrivers.map((drv) {
+                        final isAhead = drv['isAhead'] == true;
+                        final distM = drv['distanceMeters'] ?? 0;
+                        final speed = (drv['speed'] as num?)?.toDouble() ?? 0.0;
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: HardwarePalette.debossedSlot,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                "NO NETWORK / DEAD ZONE ACTIVE",
-                                style: GoogleFonts.spaceGrotesk(
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w800,
-                                  color: const Color(0xFF38BDF8),
-                                  letterSpacing: 0.5,
+                              Expanded(
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      isAhead ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                                      color: isAhead ? const Color(0xFF38BDF8) : Colors.amberAccent,
+                                      size: 16,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            drv['driverName'] ?? 'Operator',
+                                            style: GoogleFonts.spaceGrotesk(fontSize: 12, fontWeight: FontWeight.w800, color: HardwarePalette.silkscreenDark),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          Text(
+                                            "${drv['vehiclePlate'] ?? 'KA-19'} • ${speed.toStringAsFixed(0)} km/h",
+                                            style: GoogleFonts.spaceGrotesk(fontSize: 9.5, color: HardwarePalette.silkscreenMuted),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              const SizedBox(height: 1),
-                              Text(
-                                "${SocketService.offlineBufferedCount} points saved locally. Auto-syncs to server upon reconnect.",
-                                style: GoogleFonts.spaceGrotesk(fontSize: 9.5, color: Colors.white70),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: (isAhead ? const Color(0xFF38BDF8) : Colors.amberAccent).withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  "${distM}m ${isAhead ? 'AHEAD ↗' : 'BEHIND ↘'}",
+                                  style: GoogleFonts.spaceGrotesk(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900,
+                                    color: isAhead ? const Color(0xFF38BDF8) : Colors.amberAccent,
+                                  ),
+                                ),
                               ),
                             ],
                           ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF38BDF8).withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            "${SocketService.offlineBufferedCount}/500",
-                            style: GoogleFonts.spaceGrotesk(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              color: const Color(0xFF38BDF8),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                        );
+                      }).toList(),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -177,7 +387,11 @@ class _HomeScreenState extends State<HomeScreen> {
               _buildEarningsCollectionDeck(context, trip, safetyScore, isEsp32),
               const SizedBox(height: 14),
 
-              // ── 5. TACTILE ACTION BUTTONS ─────────────────────────────
+              // ── 5. SECONDARY DEAD ZONE P2P MESH CONNECT BUTTON (BELOW PRICE/EARNINGS) ──
+              _buildDeadZoneConnectDeck(context, trip),
+              const SizedBox(height: 14),
+
+              // ── 6. TACTILE ACTION BUTTONS ─────────────────────────────
               _buildTactileActionGrid(context, trip, sensor, p),
               const SizedBox(height: 12),
 
@@ -213,8 +427,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   Scaffold.of(innerContext).openDrawer();
                 },
                 child: Container(
-                  width: 38,
-                  height: 38,
+                  width: 36,
+                  height: 36,
                   decoration: BoxDecoration(
                     color: HardwarePalette.milledSurface,
                     shape: BoxShape.circle,
@@ -237,160 +451,214 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
+            const SizedBox(width: 6),
 
-            // Center Logo: Pixel block title with signature orange dot
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  "SMART",
-                  style: GoogleFonts.silkscreen(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                    color: HardwarePalette.silkscreenDark,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-                Container(
-                  width: 5,
-                  height: 5,
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE53935),
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFE53935).withOpacity(0.5),
-                        blurRadius: 4,
+            // Center Logo: Pixel block title with signature orange dot (Flexible)
+            Expanded(
+              child: Center(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        "SMART",
+                        style: GoogleFonts.silkscreen(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w900,
+                          color: HardwarePalette.silkscreenDark,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                      Container(
+                        width: 4.5,
+                        height: 4.5,
+                        margin: const EdgeInsets.symmetric(horizontal: 3.5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE53935),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFE53935).withOpacity(0.5),
+                              blurRadius: 4,
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        "DRIVING",
+                        style: GoogleFonts.silkscreen(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w900,
+                          color: HardwarePalette.silkscreenDark,
+                          letterSpacing: 1.0,
+                        ),
                       ),
                     ],
                   ),
                 ),
-                Text(
-                  "DRIVING",
-                  style: GoogleFonts.silkscreen(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                    color: HardwarePalette.silkscreenDark,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-              ],
+              ),
             ),
+            const SizedBox(width: 6),
 
-            // Right: Order symbol with live bubble badge & Safety Profile Pill
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                GestureDetector(
-                  onTap: () {
-                    HapticService.selectionClick();
-                    Navigator.pushNamed(context, AppRoutes.orders);
-                  },
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: HardwarePalette.milledSurface,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: HardwarePalette.matrixBorderLight, width: 1.0),
-                          boxShadow: [
-                            BoxShadow(
-                              color: HardwarePalette.isDark ? Colors.black.withOpacity(0.2) : const Color(0xFF23201C).withOpacity(0.04),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
+            // Right: Emergency SOS button, Order symbol with live bubble badge & Safety Profile Pill
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      HapticService.heavyImpact();
+                      trip.triggerManualSOS();
+                      Navigator.pushNamed(context, AppRoutes.crash);
+                    },
+                    child: Container(
+                      height: 34,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDC2626),
+                        borderRadius: BorderRadius.circular(17),
+                        border: Border.all(color: Colors.white, width: 1.2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFDC2626).withOpacity(0.45),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.sos_rounded, color: Colors.white, size: 16),
+                          const SizedBox(width: 2.5),
+                          Text(
+                            "SOS",
+                            style: GoogleFonts.spaceGrotesk(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              letterSpacing: 0.5,
                             ),
-                          ],
-                        ),
-                        child: const Center(
-                          child: Icon(
-                            Icons.local_shipping_outlined,
-                            color: Color(0xFFFF5722),
-                            size: 19,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+
+                  GestureDetector(
+                    onTap: () {
+                      HapticService.selectionClick();
+                      Navigator.pushNamed(context, AppRoutes.orders);
+                    },
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            color: HardwarePalette.milledSurface,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: HardwarePalette.matrixBorderLight, width: 1.0),
+                            boxShadow: [
+                              BoxShadow(
+                                color: HardwarePalette.isDark ? Colors.black.withOpacity(0.2) : const Color(0xFF23201C).withOpacity(0.04),
+                                blurRadius: 5,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              Icons.local_shipping_outlined,
+                              color: Color(0xFFFF5722),
+                              size: 17,
+                            ),
                           ),
                         ),
-                      ),
-                      if (trip.availableOrders.isNotEmpty)
-                        Positioned(
-                          top: -3,
-                          right: -3,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1.5),
-                            constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFEF4444),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: Colors.white, width: 1.5),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFFEF4444).withOpacity(0.5),
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 1),
-                                ),
-                              ],
-                            ),
-                            child: Center(
-                              child: Text(
-                                trip.availableOrders.length > 9 ? "9+" : "${trip.availableOrders.length}",
-                                style: GoogleFonts.spaceGrotesk(
-                                  fontSize: 8.5,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.white,
-                                  height: 1.0,
+                        if (trip.availableOrders.isNotEmpty)
+                          Positioned(
+                            top: -3,
+                            right: -3,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                              constraints: const BoxConstraints(minWidth: 15, minHeight: 15),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEF4444),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Colors.white, width: 1.2),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFFEF4444).withOpacity(0.5),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ],
+                              ),
+                              child: Center(
+                                child: Text(
+                                  trip.availableOrders.length > 9 ? "9+" : "${trip.availableOrders.length}",
+                                  style: GoogleFonts.spaceGrotesk(
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                    height: 1.0,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
+                  const SizedBox(width: 6),
 
-                // Safety & Driver Profile Pill
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: HardwarePalette.milledSurface,
-                    borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: HardwarePalette.matrixBorderLight, width: 1.0),
-                    boxShadow: [
-                      BoxShadow(
-                        color: HardwarePalette.isDark ? Colors.black.withOpacity(0.2) : const Color(0xFF23201C).withOpacity(0.04),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.shield_rounded, size: 14, color: HardwarePalette.silkscreenDark),
-                      const SizedBox(width: 5),
-                      Text(
-                        "${profile.currentSafetyScore.toInt()}",
-                        style: GoogleFonts.spaceGrotesk(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: HardwarePalette.silkscreenDark,
+                  // Safety & Driver Profile Pill
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: HardwarePalette.milledSurface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: HardwarePalette.matrixBorderLight, width: 1.0),
+                      boxShadow: [
+                        BoxShadow(
+                          color: HardwarePalette.isDark ? Colors.black.withOpacity(0.2) : const Color(0xFF23201C).withOpacity(0.04),
+                          blurRadius: 5,
+                          offset: const Offset(0, 2),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        width: 20,
-                        height: 20,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: HardwarePalette.debossedSlot,
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.shield_rounded, size: 13, color: HardwarePalette.silkscreenDark),
+                        const SizedBox(width: 4),
+                        Text(
+                          "${profile.currentSafetyScore.toInt()}",
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: HardwarePalette.silkscreenDark,
+                          ),
                         ),
-                        child: Icon(Icons.person_rounded, size: 14, color: HardwarePalette.silkscreenDark),
-                      ),
-                    ],
+                        const SizedBox(width: 6),
+                        Container(
+                          width: 18,
+                          height: 18,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: HardwarePalette.debossedSlot,
+                          ),
+                          child: Icon(Icons.person_rounded, size: 12, color: HardwarePalette.silkscreenDark),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),
@@ -560,6 +828,245 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ],
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // SECONDARY DEAD ZONE P2P MESH CONNECT DECK (BELOW PRICE/EARNINGS HERO)
+  // ──────────────────────────────────────────────────────────────────────────
+  Widget _buildDeadZoneConnectDeck(BuildContext context, TripProvider trip) {
+    final isActive = trip.isDeadZoneActive;
+    return GestureDetector(
+      onTap: () {
+        HapticService.selectionClick();
+        trip.toggleDeadZoneMode();
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: isActive
+              ? (HardwarePalette.isDark ? const Color(0xFF032541) : const Color(0xFFE0F2FE))
+              : HardwarePalette.milledSurface,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: isActive
+                ? const Color(0xFF38BDF8)
+                : HardwarePalette.matrixBorderLight,
+            width: isActive ? 1.6 : 1.2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: isActive
+                  ? const Color(0xFF0284C7).withOpacity(HardwarePalette.isDark ? 0.35 : 0.2)
+                  : (HardwarePalette.isDark ? Colors.black.withOpacity(0.2) : const Color(0xFF23201C).withOpacity(0.04)),
+              blurRadius: isActive ? 14 : 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                // Glowing Icon Node
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: isActive
+                        ? const Color(0xFF38BDF8).withOpacity(0.2)
+                        : HardwarePalette.debossedSlot,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isActive ? const Color(0xFF38BDF8) : HardwarePalette.matrixBorderLight,
+                      width: 1.2,
+                    ),
+                  ),
+                  child: Icon(
+                    isActive ? Icons.wifi_tethering_rounded : Icons.cell_tower_rounded,
+                    color: isActive ? const Color(0xFF38BDF8) : HardwarePalette.silkscreenSubtle,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 12),
+
+                // Titles and live state description
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 6,
+                        runSpacing: 2,
+                        children: [
+                          Text(
+                            "DEAD ZONE CONNECT",
+                            style: GoogleFonts.spaceGrotesk(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w900,
+                              color: isActive ? const Color(0xFF38BDF8) : HardwarePalette.silkscreenDark,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: isActive
+                                  ? const Color(0xFF10B981).withOpacity(0.2)
+                                  : Colors.grey.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 5,
+                                  height: 5,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: isActive ? const Color(0xFF10B981) : Colors.grey,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  isActive ? "MESH ACTIVE" : "STANDBY",
+                                  style: GoogleFonts.spaceGrotesk(
+                                    fontSize: 8.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: isActive ? const Color(0xFF10B981) : Colors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        isActive
+                            ? "Relaying telemetry via nearby fleet mesh • ${SocketService.offlineBufferedCount} packets queued"
+                            : "Tap to bridge telemetry via nearest drivers when out of cellular range",
+                        style: GoogleFonts.spaceGrotesk(
+                          fontSize: 10,
+                          color: HardwarePalette.silkscreenMuted,
+                          height: 1.25,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+
+                // Tactile Connect / Disconnect Trigger Button
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isActive
+                        ? const Color(0xFF38BDF8)
+                        : HardwarePalette.debossedSlot,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isActive ? const Color(0xFF38BDF8) : HardwarePalette.matrixBorderLight,
+                      width: 1.0,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isActive ? Icons.power_settings_new_rounded : Icons.sensors_rounded,
+                        size: 13,
+                        color: isActive ? Colors.white : HardwarePalette.silkscreenDark,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        isActive ? "ON" : "CONNECT",
+                        style: GoogleFonts.spaceGrotesk(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                          color: isActive ? Colors.white : HardwarePalette.silkscreenDark,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            // Sub-bar with telemetry nodes & buffer count
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: HardwarePalette.debossedSlot.withOpacity(0.6),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      "BUFFER: ${SocketService.offlineBufferedCount} PTS",
+                      style: GoogleFonts.spaceGrotesk(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        color: isActive ? const Color(0xFF38BDF8) : HardwarePalette.silkscreenSubtle,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Container(
+                    width: 1,
+                    height: 10,
+                    color: HardwarePalette.matrixBorderLight,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      trip.sameDirectionDrivers.isNotEmpty
+                          ? "${trip.sameDirectionDrivers.length} FLEET PEERS IN RANGE"
+                          : "SCANNING PEERS...",
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.spaceGrotesk(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        color: trip.sameDirectionDrivers.isNotEmpty ? const Color(0xFF10B981) : HardwarePalette.silkscreenSubtle,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    width: 1,
+                    height: 10,
+                    color: HardwarePalette.matrixBorderLight,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      "P2P RELAY 500M",
+                      textAlign: TextAlign.right,
+                      style: GoogleFonts.spaceGrotesk(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        color: HardwarePalette.silkscreenSubtle,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1486,6 +1993,47 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 10),
+          GestureDetector(
+            onTap: () {
+              trip.requestCrossDeliveryHandover();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text("🤝 Cross-Delivery Handover broadcasted! 30% payout reserved for you; 70% bounty to relay driver."),
+                  backgroundColor: Color(0xFFD97706),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+            child: Container(
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF59E0B).withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.5)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.swap_horiz_rounded, size: 18, color: Color(0xFFF59E0B)),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        "RELAY HANDOVER (30% YOU / 70% PASSING DRIVER)",
+                        style: GoogleFonts.spaceGrotesk(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFFF59E0B),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),

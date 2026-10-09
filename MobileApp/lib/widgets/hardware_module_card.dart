@@ -45,7 +45,7 @@ class HardwareModuleCard extends StatelessWidget {
                     width: 4,
                     height: 4,
                     margin: const EdgeInsets.only(right: 6),
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       color: HardwarePalette.mechanicalScrew,
                       shape: BoxShape.rectangle,
                     ),

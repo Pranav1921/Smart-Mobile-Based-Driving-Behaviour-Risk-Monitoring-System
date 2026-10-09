@@ -78,6 +78,10 @@ export interface Vehicle {
 export interface Driver {
   id: string
   userId?: string
+  driverId?: string
+  isDeadZone?: boolean
+  alertType?: string
+  sosReason?: string
   name: string
   email?: string
   phone?: string
@@ -149,6 +153,8 @@ export interface Driver {
   region?: string
   points?: number
   earnings?: number
+  isAvailable?: boolean
+  isAvailableForRescue?: boolean
 }
 
 export interface FleetEvent {

@@ -1,0 +1,114 @@
+\chapter{Literature Survey}
+\label{chap:literature_review}
+
+\section{Introduction}
+\label{sec:lit_intro}
+A literature review is a thorough summary of earlier studies on a subject. The literature review examines scholarly books, journals, and other sources that are pertinent to a particular field of study.
+
+\section{Literature Survey}
+\label{sec:lit_survey}
+
+M. Zarei Yazd et al. [1] (2024) proposed a robust machine learning framework for detecting driving events using smartphone sensor data. The system utilizes accelerometer and gyroscope signals to classify driving behaviors such as acceleration, braking, lane changing, and turning events. Advanced preprocessing techniques are applied to remove noise and normalize sensor readings before feature extraction. Ensemble learning models are then used for classification, achieving high accuracy in real-world scenarios. However, the study highlights limitations such as sensitivity to smartphone placement, environmental noise, and variability in driving conditions, which affect system robustness in uncontrolled environments.
+
+E. Papatheocharous et al. [2] (2023) developed a smartphone-based system for detecting distracted driving behavior. The system continuously monitors user interactions and motion patterns to identify unsafe driving actions such as phone usage while driving, abrupt braking, and lane deviation. Machine learning classifiers are trained on sensor data to distinguish between normal and distracted driving states. The study demonstrates that smartphone-based monitoring is cost-effective and scalable. However, performance degradation occurs under complex traffic conditions and inconsistent sensor readings.
+
+B. Adhikari [3] (2023) presented a comprehensive survey on driver behavior analysis using visual and vehicular sensor systems. The study compares traditional camera-based monitoring approaches with modern smartphone-based sensing techniques. It highlights the increasing role of deep learning in extracting behavioral patterns from sensor data. The paper also discusses key challenges such as dataset limitations, privacy concerns, and computational overhead in real-time systems.
+
+S. Ben Brahim et al. [4] (2022) proposed a machine learning framework for driver behavior classification using smartphone sensor data. The system uses accelerometer and gyroscope signals to identify driving styles such as aggressive and normal driving. Multiple classifiers including Random Forest and Support Vector Machines are evaluated. Results show high accuracy when proper preprocessing and balanced datasets are used, demonstrating the effectiveness of smartphone-based sensing.
+
+P. Wawage et al. [5] (2022) introduced a structured dataset for driver behavior analysis using smartphone sensors. The dataset includes labeled driving patterns such as normal driving, harsh braking, and aggressive acceleration. It serves as a benchmark for training machine learning models. However, the study notes limitations in environmental diversity and controlled data collection conditions, which may reduce real-world generalization.
+
+E. Mantouka et al. [6] (2021) explored smartphone sensing techniques for analyzing driving behavior using accelerometer and GPS data. The study shows that smartphones can effectively replace expensive vehicle-installed sensors for basic driving analysis. However, the authors highlight challenges such as sensor noise, signal inconsistency, and reduced accuracy in complex driving environments.
+
+D. N. Lu et al. [7] (2021) proposed a system for detecting vehicle modes and driving activities using smartphone inertial sensors. The system classifies transportation modes such as walking, cycling, and driving based on motion patterns. While effective, the system struggles to differentiate between similar motion states such as slow driving and stationary vehicle conditions.
+
+E. Huang et al. [8] (2021) studied sensor fusion techniques combining accelerometer and gyroscope data for activity recognition. The study demonstrates that multi-sensor fusion significantly improves classification accuracy compared to single-sensor systems. However, variability in device placement and calibration issues remain key challenges.
+
+J. Warren et al. [9] (2021) analyzed driving behavior clusters using observational smartphone sensor data. The study uses unsupervised learning techniques to group drivers into behavioral categories such as aggressive, cautious, and normal drivers. However, the model is mainly suitable for offline analysis and lacks real-time deployment capability.
+
+J. K. Mahendran et al. [10] (2021) developed a mobile edge AI system for real-time environmental awareness. The system uses deep learning for object detection and edge computing for low-latency processing. Although designed for assistive applications, it is relevant to driver safety systems due to its real-time decision-making capability.
+
+D. Giansanti and A. Pirrera [11] (2021) analyzed AI applications in assistive and monitoring systems. The study highlights the use of AI in mobility assistance and behavior detection systems. However, issues such as privacy concerns, ethical challenges, and high implementation costs limit large-scale deployment.
+
+A. Avdic et al. [12] (2021) explored intelligent data processing techniques using NLP and analytics systems. Although focused on healthcare, the study's concepts of real-time data processing and intelligent decision-making are applicable to transportation systems. It emphasizes scalable architectures for IoT-based applications.
+
+A. J. Al-Haider et al. [13] (2020) developed an IoT-based smart monitoring system using embedded sensors and hardware integration. The system demonstrates real-time monitoring capabilities but faces challenges in synchronization, scalability, and maintenance in real-world deployments.
+
+T. Nedovic et al. [14] (2020) proposed a mobile-based assistive monitoring system that enhances user interaction and accessibility. The system provides real-time alerts and mobile-based tracking features. However, it depends heavily on continuous internet connectivity, limiting performance in low-network areas.
+
+Cheng Bo et al. [15] (2020) introduced the TEXIVE system, a foundational smartphone-based driver detection framework using inertial sensors. The system identifies driving activity based on motion patterns and laid the foundation for modern driver monitoring systems. However, it lacks deep learning techniques and modern optimization methods used in current systems.
+
+\section{Summary of Literature Survey}
+\label{sec:lit_summary}
+Table~\ref{tab:lit_survey_summary} reviews work on driver behavior analysis using sensor data and ML for safety monitoring. Current systems face issues like high cost, sensor noise, and smartphone dependency. This highlights the need for the proposed low-cost, real-time ESP32 and BLE-based Smart Fleet Intelligence System.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Literature Survey Summary}
+\label{tab:lit_survey_summary}
+\begin{tabularx}{\textwidth}{lp{3.5cm}p{3.5cm}p{2.5cm}p{2.5cm}}
+\toprule
+\textbf{Author} & \textbf{Title of Paper} & \textbf{Proposed Solution} & \textbf{Advantages} & \textbf{Disadvantages} \\
+\midrule
+M. Zarei Yazd (2024) & ML-based driving event detection & Smartphone sensor-based ensemble ML model & High accuracy, real-time detection & Sensitive to phone placement \& noise \\
+\addlinespace
+Papatheocharous et al. (2023) & Distracted driving monitoring & Sensor-based distraction detection system & Cost-effective, scalable & Poor performance in complex traffic \\
+\addlinespace
+Adhikari (2023) & Driver behavior analysis survey & Comparison of visual + sensor systems & Comprehensive review & No implementation model \\
+\addlinespace
+Ben Brahim et al. (2022) & Driver behavior classification & ML-based sensor classification & High accuracy with proper training & Needs balanced dataset \\
+\addlinespace
+P. Wawage et al. (2022) & Smartphone sensor dataset & Dataset for ML-based behavior models & Useful benchmark dataset & Limited real-world diversity \\
+\addlinespace
+Mantouka et al. (2021) & Driving behavior sensing & GPS + accelerometer analysis & Low-cost alternative & Sensor noise issues \\
+\addlinespace
+D. N. Lu et al. (2021) & Vehicle mode detection & Classifies transport modes using inertial sensors & Multi-mode detection capability & Confusion between similar motion states \\
+\addlinespace
+Mahendran et al. (2021) & Mobile edge AI system & Edge-based deep learning system & Low latency & Energy consumption issue \\
+\addlinespace
+J. Warren et al. (2021) & Driving behavior clustering & Unsupervised ML for driver grouping & Useful for driver profiling & No real-time implementation \\
+\addlinespace
+D. Giansanti \& A. Pirrera (2021) & AI in assistive systems & AI-based assistive and monitoring review & Enhances accessibility & Privacy and cost issues \\
+\addlinespace
+A. Avdic et al. (2021) & Smart data processing & NLP and intelligent analytics techniques & Efficient data processing & Complex system design \\
+\addlinespace
+J. K. Mahendran et al. (2021) & Mobile edge AI assistive & Real-time object detection using edge AI & Fast real-time response & High energy consumption \\
+\addlinespace
+A. J. Al-Haider et al. (2020) & IoT smart monitoring & Embedded IoT-based monitoring system & Automation and real-time monitoring & Hardware dependency issues \\
+\addlinespace
+T. Nedovic et al. (2020) & Mobile assistive system & Mobile-based alert and support system & Improves usability & Requires continuous connectivity \\
+\addlinespace
+Cheng Bo et al. (2020) & TEXIVE driver detection & Inertial sensor-based driver detection & Foundational system & No deep learning integration \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Comparison with Existing Systems}
+\label{sec:comp_existing}
+Existing driver monitoring systems mainly use vehicle-installed telematics or smartphone-based sensing to track driving behavior such as speed, braking, and acceleration patterns. While vehicle-based systems are accurate and reliable, they are expensive and require dedicated hardware installation, making them less suitable for low-cost or prototype applications.
+
+Smartphone-based solutions use sensors like accelerometer and gyroscope with machine learning models for behavior classification. These systems are cost-effective and portable but suffer from issues like sensor noise, device placement variations, and battery consumption during continuous monitoring.
+
+Some advanced hybrid systems combine vision-based methods and multiple sensors to improve accuracy, but they are computationally heavy and not suitable for lightweight real-time deployment.
+
+Compared to these, the proposed system uses ESP32 with BLE communication and sensor integration for real-time monitoring with low cost and low power consumption. It also combines threshold-based detection with ML classification, making it more efficient and practical for real-time driver safety applications.
+
+\section{Proposed System}
+\label{sec:proposed_system}
+The proposed system is a Mobile-Based Smart Fleet Intelligence and Driver Safety Monitoring System designed to monitor and analyze driving behavior in real time using a combination of ESP32-based sensors, BLE communication, and machine learning techniques. The system collects motion data such as acceleration, braking patterns, and vehicle movement using embedded sensors connected to ESP32, which acts as the core processing and transmission unit.
+
+The collected data is transmitted to a mobile or cloud-based application through Bluetooth Low Energy (BLE) for real-time monitoring. Machine learning algorithms are used to classify driving behavior into safe and risky categories, while threshold-based rules are applied for immediate detection of events like overspeeding and harsh braking.
+
+A user-friendly dashboard is provided to visualize driving statistics, trip history, and safety scores, enabling better understanding of driver performance. The system is designed to be low-cost, energy-efficient, and scalable, making it suitable for both individual and fleet-level applications.
+
+\section{Objectives}
+\label{sec:objectives}
+\begin{itemize}
+    \item To design a sensor-based data acquisition system using ESP32 for collecting real-time driving parameters such as acceleration, braking, and motion patterns.
+    \item To transmit sensor data efficiently using Bluetooth Low Energy (BLE) for low-power real-time communication.
+    \item To apply machine learning techniques for classifying driving behavior into safe and unsafe categories.
+    \item To implement threshold-based detection for instant identification of events like harsh braking and overspeeding.
+    \item To develop a dashboard for visualizing driver performance, trip analytics, and safety scores in an easy-to-understand format.
+    \item To create a cost-effective and scalable system suitable for both individual users and fleet management applications.
+\end{itemize}

@@ -22,31 +22,36 @@ export function extractRegionToken(val?: string | null): string {
   if (lower.includes('hyderabad')) return 'hyderabad';
   if (lower.includes('delhi')) return 'delhi';
   if (lower.includes('kochi') || lower.includes('ernakulam')) return 'kochi';
-  return lower;
+  if (lower.includes('all') || lower.includes('global') || lower.includes('national') || lower.includes('regional')) return 'all';
+  return '';
 }
 
 /**
- * Strict Regional Isolation:
- * Ensures drivers from one region (e.g., Kadaba) can NEVER be seen or accessed
- * by admins of another region (e.g., Puttur), and vice-versa.
+ * Ensures drivers from one region are filtered appropriately,
+ * while NEVER hiding active dead-zone, emergency, or connected fleet drivers.
  */
 export function isDriverInRegion(driver: Partial<Driver> | any, adminRegionId?: string | null): boolean {
-  if (!adminRegionId || adminRegionId === 'all' || adminRegionId === 'super_admin' || adminRegionId === 'global') {
+  if (!driver) return false;
+
+  // 1. Critical safety rule: Emergency and Cellular Dead Zone drivers are ALWAYS visible to fleet command
+  if (driver.status === 'emergency' || driver.isDeadZone === true || driver.alertType === 'SOS' || driver.alertType === 'CRASH') {
+    return true;
+  }
+
+  if (!adminRegionId || adminRegionId === 'all' || adminRegionId === 'super_admin' || adminRegionId === 'global' || adminRegionId === 'default') {
     return true;
   }
 
   const adminToken = extractRegionToken(adminRegionId);
   if (!adminToken || adminToken === 'all' || adminToken === 'karnataka') return true;
 
-  // 1. Check all explicit region & zone fields on driver
+  // 2. Check region & zone text fields on driver
   const rawFields = [
     driver.regionId,
     driver.region,
     driver.zone,
     driver.user?.zone,
     driver.locationName,
-    driver.companyCode,
-    driver.fleet,
     driver.user?.region,
     driver.address,
   ].filter(Boolean) as string[];
@@ -62,40 +67,44 @@ export function isDriverInRegion(driver: Partial<Driver> | any, adminRegionId?: 
   const driverToken = extractRegionToken(combinedStr);
 
   if (driverToken) {
-    // Strict isolation: driver belongs to this region only if tokens match exactly
-    return driverToken === adminToken;
+    if (driverToken === 'all' || driverToken === adminToken) return true;
   }
 
-  // 2. Fallback to Geographic coordinate bounding boxes if no text region token is set
+  // 3. Fallback to Geographic coordinate bounding boxes
   const lat = driver.location?.lat ?? driver.latitude;
   const lng = driver.location?.lng ?? driver.longitude;
 
   if (typeof lat === 'number' && typeof lng === 'number' && lat !== 0 && lng !== 0 && !isNaN(lat) && !isNaN(lng)) {
     if (adminToken === 'puttur') {
-      return lat >= 12.72 && lat <= 12.84 && lng >= 75.14 && lng <= 75.26;
+      return (lat >= 12.65 && lat <= 12.90 && lng >= 75.10 && lng <= 75.35) || (lat >= 12.50 && lat <= 13.15 && lng >= 75.00 && lng <= 75.60);
     }
     if (adminToken === 'kadaba') {
-      return lat >= 12.68 && lat <= 12.80 && lng >= 75.26 && lng <= 75.42;
+      return (lat >= 12.60 && lat <= 12.88 && lng >= 75.20 && lng <= 75.55);
     }
     if (adminToken === 'mangalore') {
-      return lat >= 12.80 && lat <= 13.02 && lng >= 74.78 && lng <= 74.96;
+      return (lat >= 12.75 && lat <= 13.05 && lng >= 74.75 && lng <= 75.00);
     }
     if (adminToken === 'bantwal') {
-      return lat >= 12.84 && lat <= 12.95 && lng >= 74.98 && lng <= 75.10;
+      return (lat >= 12.80 && lat <= 12.98 && lng >= 74.95 && lng <= 75.15);
     }
     if (adminToken === 'sullia') {
-      return lat >= 12.50 && lat <= 12.65 && lng >= 75.32 && lng <= 75.48;
+      return (lat >= 12.45 && lat <= 12.70 && lng >= 75.25 && lng <= 75.55);
     }
     if (adminToken === 'belthangady') {
-      return lat >= 12.94 && lat <= 13.06 && lng >= 75.20 && lng <= 75.34;
+      return (lat >= 12.90 && lat <= 13.10 && lng >= 75.15 && lng <= 75.40);
     }
     if (adminToken === 'moodbidri') {
-      return lat >= 13.02 && lat <= 13.14 && lng >= 74.94 && lng <= 75.06;
+      return (lat >= 12.98 && lat <= 13.18 && lng >= 74.90 && lng <= 75.10);
     }
-    // Dakshina Kannada district-wide cluster (Lat: 12.4 to 13.2, Lng: 74.7 to 75.7)
+    // Dakshina Kannada district-wide cluster
     if (adminToken.includes('dakshina') || adminToken === 'dk') {
-      return lat >= 12.4 && lat <= 13.2 && lng >= 74.7 && lng <= 75.7;
+      return lat >= 12.4 && lat <= 13.3 && lng >= 74.6 && lng <= 75.7;
     }
+  }
+
+  // If driver has no coordinates or no explicit mismatch, keep visible if active
+  if (driver.status && driver.status !== 'offline') {
+    return true;
   }
 
   return false;

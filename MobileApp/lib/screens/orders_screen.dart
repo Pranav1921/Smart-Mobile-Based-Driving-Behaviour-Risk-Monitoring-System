@@ -547,7 +547,7 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                "Delivered! +₹${(completedTrip.payout ?? 0.0).toInt()} & +${completedTrip.pointsEarned} PTS Added",
+                                "Delivered! +₹${(completedTrip.payout ?? 0.0).toInt()} & +${completedTrip.pointsEarned} PTS (${completedTrip.safetyScore.toInt()}% Safe Driving Bonus)",
                                 style: const TextStyle(fontWeight: FontWeight.w700),
                               ),
                             ),

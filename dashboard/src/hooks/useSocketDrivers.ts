@@ -87,6 +87,16 @@ export function useSocketDrivers(initialMockDrivers: Driver[]) {
   const [pendingDrivers, setPendingDrivers] = useState<any[]>([]);
   const [newRequestToast, setNewRequestToast] = useState<{ id: string; name: string; zone: string; time: string; count: number } | null>(null);
 
+  // Driver Confirmed Safe Announcement Toast
+  const [driverSafeToast, setDriverSafeToast] = useState<{ driverName: string; time: string; reason?: string } | null>(null);
+  const dismissDriverSafeToast = useCallback(() => setDriverSafeToast(null), []);
+
+  // Cross-Delivery (30% / 70% Split) Handover & Same-Direction Fleet Convoy
+  const [crossDeliveryOffer, setCrossDeliveryOffer] = useState<any | null>(null);
+  const [crossDeliveryToast, setCrossDeliveryToast] = useState<{ title: string; message: string; type: 'available' | 'confirmed' } | null>(null);
+  const [sameDirectionSummary, setSameDirectionSummary] = useState<{ count: number; pairs: any[] } | null>(null);
+  const dismissCrossDeliveryToast = useCallback(() => setCrossDeliveryToast(null), []);
+
   const refreshPendingDrivers = useCallback(async (zone?: string) => {
     try {
       const data = await fetchPendingDrivers(zone);
@@ -222,12 +232,16 @@ export function useSocketDrivers(initialMockDrivers: Driver[]) {
     });
 
     socket.on('driver_location_update', (data: any) => {
-      if (!data || data.driverId === 'agent-x' || data.driverId === 'mobile-driver') {
+      if (!data || data.driverId === 'agent-x') {
         return;
+      }
+      // Normalize mobile-driver to a real tracked ID if necessary
+      if (data.driverId === 'mobile-driver') {
+        data.driverId = data.driverName ? `DRV-${data.driverName.replace(/\s+/g, '-').toUpperCase()}` : 'DRV-PTR-2026-001';
       }
       console.log("[Dashboard] 📡 LIVE DRIVER DATA RECEIVED:", data.driverName, data.status, data.regionId, "Points:", data.points, "Earnings:", data.earnings);
       setLiveDrivers((prev) => {
-        const updated = prev.filter(d => d.id !== 'agent-x' && d.id !== 'mobile-driver' && d.userId !== 'agent-x' && d.userId !== 'mobile-driver');
+        const updated = prev.filter(d => d.id !== 'agent-x' && d.userId !== 'agent-x');
         const cleanName = (data.driverName || data.name || '').toLowerCase().trim();
         const incomingId = (data.driverId || data.id || '').toLowerCase().trim();
         const incomingEmail = (data.email || '').toLowerCase().trim();
@@ -283,6 +297,7 @@ export function useSocketDrivers(initialMockDrivers: Driver[]) {
             orderItems: data.orderItems ?? updated[idx].orderItems,
             avatar: data.avatar ?? (updated[idx] as any).avatar,
             leaveReason: data.leaveReason !== undefined ? data.leaveReason : (updated[idx] as any).leaveReason,
+            isDeadZone: data.isDeadZone !== undefined ? data.isDeadZone : (updated[idx] as any).isDeadZone,
           };
         } else if (data.status !== 'offline') {
           updated.push(createNewLiveDriver(data));
@@ -344,17 +359,39 @@ export function useSocketDrivers(initialMockDrivers: Driver[]) {
     });
 
     socket.on('sos_alert', (data: any) => {
-      const currentRegion = getActiveAdminRegionId();
-      if (isDriverInRegion(data, currentRegion)) {
-        const enriched = {
-          ...data,
-          alertType: 'SOS',
-          alertId: `sos-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-          timestamp: Date.now(),
-        };
-        console.log('[Dashboard] 🚨 DRIVER MANUAL SOS ALERT RECEIVED:', enriched);
-        setSosAlertDriver(enriched);
+      console.log('[Dashboard] 🚨 DRIVER MANUAL SOS ALERT RECEIVED:', data);
+      playNotificationChime();
+      const enriched = {
+        ...data,
+        alertType: 'SOS',
+        alertId: data.id || `sos-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        timestamp: Date.now(),
+      };
+      // Immediately reflect emergency status on live drivers state
+      const targetDriverId = data.driverId || data.id;
+      if (targetDriverId) {
+        setLiveDrivers(prev =>
+          prev.map(d => {
+            if (d.id === targetDriverId || d.userId === targetDriverId || d.employeeId === targetDriverId) {
+              return { ...d, status: 'emergency', alertType: 'SOS', sosReason: data.reason || 'Manual SOS Panic Beacon' };
+            }
+            return d;
+          })
+        );
       }
+      setSosAlertDriver(enriched);
+    });
+
+    socket.on('driver_sos_alert', (data: any) => {
+      console.log('[Dashboard] 🚨 DRIVER SOS ALERT (DIRECT):', data);
+      playNotificationChime();
+      const enriched = {
+        ...data,
+        alertType: 'SOS',
+        alertId: data.id || `sos-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        timestamp: Date.now(),
+      };
+      setSosAlertDriver(enriched);
     });
 
     socket.on('deadzone_burst_synced', (data: any) => {
@@ -386,24 +423,58 @@ export function useSocketDrivers(initialMockDrivers: Driver[]) {
       }
     });
 
-    socket.on('driver_safety_confirmed', (data: any) => {
+    const handleSafetyConfirmed = (data: any) => {
       console.log('[Dashboard] ✅ Driver safety confirmed event received:', data);
+      const rawName = data.driverName || 'Driver';
+      const cleanName = rawName.replace(/\s+applicant$/i, '').trim() || 'Driver';
+
+      // 1. Immediately dismiss any red crisis/panic modals
       setCrashAlertDriver(null);
       setSosAlertDriver(null);
       setBreakdownAlert(null);
+      setLiveFrame(null);
+
+      // 2. Play high-tech notification audio chime
+      playNotificationChime();
+
+      // 3. Trigger high-visibility green safety confirmation toast
+      setDriverSafeToast({
+        driverName: cleanName,
+        time: data.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        reason: data.reason || 'Operator clicked I AM SAFE on mobile device',
+      });
+      setTimeout(() => setDriverSafeToast(null), 10000);
+
+      // 4. Audio / Spoken announcement so admin receives voice verification
+      try {
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(`${cleanName} confirmed safe. Emergency stood down.`);
+          utterance.rate = 1.0;
+          window.speechSynthesis.speak(utterance);
+        }
+      } catch (_) {}
+
+      // 5. Update driver status in live registry to safe
       setLiveDrivers((prev) =>
         prev.map((d) => {
           const matches =
             d.id === data.driverId ||
+            (d.driverId || (d as any).driverId) === data.driverId ||
             d.userId === data.driverId ||
             d.employeeId === data.driverId ||
             d.id === data.targetId ||
             d.userId === data.targetId ||
-            (data.driverName && d.name.toLowerCase() === data.driverName.toLowerCase());
-          return matches ? { ...d, status: 'safe' } : d;
+            (cleanName && d.name.toLowerCase().trim() === cleanName.toLowerCase().trim()) ||
+            d.status === 'emergency';
+          return matches ? { ...d, status: 'safe', alertType: undefined, sosReason: undefined } : d;
         })
       );
-    });
+    };
+
+    socket.on('driver_safety_confirmed', handleSafetyConfirmed);
+    socket.on('driver_safe', handleSafetyConfirmed);
+    socket.on('safety_response', handleSafetyConfirmed);
 
     socket.on('driver_go_live', (data: any) => {
       setDriverOnlineToast(`⚡ OPERATOR LIVE: ${data.driverName || 'Driver'} is now streaming from ${data.region || data.regionId || 'Assigned Sector'}`);
@@ -431,14 +502,30 @@ export function useSocketDrivers(initialMockDrivers: Driver[]) {
     });
 
     socket.on('driver_online', (data: any) => {
+      const driverName = (data.driverName || data.name || 'Driver').replace(/\s+applicant/gi, '').trim();
+      setDriverOnlineToast(`🟢 Driver Online: ${driverName} is connected`);
+      setTimeout(() => setDriverOnlineToast(null), 5000);
+
       setLiveDrivers(prev => {
-        const idx = prev.findIndex(d => d.id === data.driverId || d.userId === data.driverId);
+        const cleanName = (data.driverName || data.name || '').toLowerCase().trim();
+        const incomingId = (data.driverId || data.id || '').toLowerCase().trim();
+        const idx = prev.findIndex(d => 
+          d.id === data.driverId || 
+          d.userId === data.driverId ||
+          (cleanName && d.name && d.name.toLowerCase().trim() === cleanName) ||
+          (incomingId && d.id && d.id.toLowerCase().trim() === incomingId)
+        );
         if (idx >= 0) {
           const updated = [...prev];
-          updated[idx] = { ...updated[idx], status: 'safe' };
-          return updated;
+          const hasCoords = data.latitude != null && data.longitude != null && data.latitude !== 0;
+          updated[idx] = { 
+            ...updated[idx], 
+            status: 'safe',
+            location: hasCoords ? { lat: data.latitude, lng: data.longitude } : updated[idx].location,
+          };
+          return deduplicateDrivers(updated);
         }
-        return [...prev, createNewLiveDriver(data)];
+        return deduplicateDrivers([...prev, createNewLiveDriver(data)]);
       });
     });
 
@@ -462,11 +549,35 @@ export function useSocketDrivers(initialMockDrivers: Driver[]) {
     })
 
     socket.on('driver_responded', (data: any) => {
-      const currentRegion = getActiveAdminRegionId();
-      if (!isDriverInRegion(data, currentRegion)) return;
+      const rawName = data.driverName || 'Driver';
+      const cleanName = rawName.replace(/\s+applicant$/i, '').trim() || 'Driver';
 
-      setJobResponseToast(`✓ Operator SECURE: ${data.driverName || 'Driver'} confirmed safe`);
-      setTimeout(() => setJobResponseToast(null), 5000);
+      // 1. Immediately dismiss any emergency modals
+      setCrashAlertDriver(null);
+      setSosAlertDriver(null);
+      setBreakdownAlert(null);
+      setLiveFrame(null);
+
+      // 2. Set prominent safe toast
+      setDriverSafeToast({
+        driverName: cleanName,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        reason: 'Operator responded SAFE to safety check',
+      });
+      setTimeout(() => setDriverSafeToast(null), 8000);
+
+      // 3. Spoken voice announcement
+      try {
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(`${cleanName} is safe`);
+          utterance.rate = 1.0;
+          window.speechSynthesis.speak(utterance);
+        }
+      } catch (_) {}
+
+      setJobResponseToast(`✓ Operator SECURE: ${cleanName} confirmed safe`);
+      setTimeout(() => setJobResponseToast(null), 6000);
 
       setPingedDrivers(prev => ({
         ...prev,
@@ -474,18 +585,20 @@ export function useSocketDrivers(initialMockDrivers: Driver[]) {
       }));
 
       // Immediately declare driver status as safe in live registry
-      setLiveDrivers(prev => {
-        const updated = [...prev];
-        const idx = updated.findIndex(d => d.id === data.driverId || d.userId === data.driverId);
-        if (idx >= 0) {
-          updated[idx] = { ...updated[idx], status: 'safe' };
-        }
-        return updated;
-      });
-
-      // Clear emergency banner & camera stream
-      setCrashAlertDriver(null);
-      setLiveFrame(null);
+      setLiveDrivers(prev =>
+        prev.map(d => {
+          const matches =
+            d.id === data.driverId ||
+            (d.driverId || (d as any).driverId) === data.driverId ||
+            d.userId === data.driverId ||
+            d.employeeId === data.driverId ||
+            d.id === data.targetId ||
+            d.userId === data.targetId ||
+            (cleanName && d.name.toLowerCase().trim() === cleanName.toLowerCase().trim()) ||
+            d.status === 'emergency';
+          return matches ? { ...d, status: 'safe' } : d;
+        })
+      );
     });
 
     socket.on('driver_no_response', (data: any) => {
@@ -529,22 +642,104 @@ export function useSocketDrivers(initialMockDrivers: Driver[]) {
     });
 
     socket.on('roadside_breakdown_alert', (data: any) => {
-      const currentRegion = getActiveAdminRegionId();
-      if (isDriverInRegion(data, currentRegion)) {
-        console.log('[Dashboard] 🚨 ROADSIDE BREAKDOWN ALERT:', data);
-        playNotificationChime();
-        const enriched = {
-          ...data,
-          alertId: `brk-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-          timestamp: Date.now(),
-        };
-        setBreakdownAlert(enriched);
+      console.log('[Dashboard] 🚨 ROADSIDE BREAKDOWN ALERT:', data);
+      playNotificationChime();
+      const enriched = {
+        ...data,
+        alertId: data.id || `brk-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        timestamp: Date.now(),
+      };
+      const targetDriverId = data.driverId || data.id;
+      if (targetDriverId) {
+        setLiveDrivers(prev =>
+          prev.map(d => {
+            if (d.id === targetDriverId || d.userId === targetDriverId || d.employeeId === targetDriverId) {
+              return { ...d, status: 'emergency', alertType: 'BREAKDOWN', sosReason: data.reason || data.issueType || 'Vehicle Breakdown' };
+            }
+            return d;
+          })
+        );
       }
+      setBreakdownAlert(enriched);
     });
 
     socket.on('locked_dashcam_evidence', (data: any) => {
       console.log('[Dashboard] 📹 LOCKED DASHCAM EVIDENCE DOSSIER RECEIVED:', data);
       setLatestLockedEvidence(data);
+    });
+
+    socket.on('driver_availability_updated', (data: { driverId: string; isAvailableForRescue?: boolean; isAvailable?: boolean }) => {
+      console.log('[Dashboard] 🛡️ DRIVER RESCUE AVAILABILITY UPDATED:', data);
+      const isAvail = data.isAvailableForRescue ?? data.isAvailable ?? true;
+      setLiveDrivers(prev =>
+        prev.map(d => {
+          if (d.id === data.driverId || d.userId === data.driverId || d.employeeId === data.driverId) {
+            return { ...d, isAvailable: isAvail, isAvailableForRescue: isAvail };
+          }
+          return d;
+        })
+      );
+    });
+
+    socket.on('driver_deadzone_status', (data: { driverId: string; isDeadZone: boolean; reason?: string; driverName?: string }) => {
+      console.log('[Dashboard] 📡 DRIVER DEAD ZONE STATUS UPDATED:', data);
+      setLiveDrivers(prev => {
+        let matched = false;
+        const updated = prev.map(d => {
+          if (d.id === data.driverId || d.userId === data.driverId || d.employeeId === data.driverId) {
+            matched = true;
+            return { ...d, isDeadZone: data.isDeadZone };
+          }
+          return d;
+        });
+        if (!matched && data.driverId) {
+          updated.push(createNewLiveDriver({
+            driverId: data.driverId,
+            name: data.driverName || data.driverId,
+            isDeadZone: data.isDeadZone,
+          }));
+        }
+        return deduplicateDrivers(updated);
+      });
+    });
+
+    socket.on('cross_delivery_available', (data: any) => {
+      console.log('[Dashboard] 🤝 CROSS-DELIVERY OFFER BROADCAST:', data);
+      setCrossDeliveryOffer(data);
+      playNotificationChime();
+      setCrossDeliveryToast({
+        title: '🤝 CROSS-DELIVERY RELAY OPPORTUNITY',
+        message: `Order #${data.orderId || 'LIVE'} from ${data.troubledDriverName || 'Driver'}: 30% base (₹${data.troubledDriverSplit || 30}) / 70% relay reward (₹${data.relayDriverSplit || 70})`,
+        type: 'available',
+      });
+      setTimeout(() => setCrossDeliveryToast(null), 10000);
+    });
+
+    const handleCrossDeliveryConfirmed = (data: any) => {
+      console.log('[Dashboard] ✅ 70/30 RELAY PARTNERSHIP CONFIRMED:', data);
+      setCrossDeliveryOffer(null);
+      playNotificationChime();
+      try {
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance('Partnership relay authorized. 30 percent secured for original driver, 70 percent assigned to relief driver.');
+          utterance.rate = 1.0;
+          window.speechSynthesis.speak(utterance);
+        }
+      } catch (_) {}
+      setCrossDeliveryToast({
+        title: '🤝 70/30 PARTNERSHIP RELAY ACTIVE',
+        message: `${data.relayDriverName || 'Relay Driver'} assigned to take over mission from ${data.troubledDriverName || 'Original Driver'}. ₹${data.troubledDriverSplit ?? 45} (30% Base) + ₹${data.relayDriverSplit ?? 105} (70% Relay).`,
+        type: 'confirmed',
+      });
+      setTimeout(() => setCrossDeliveryToast(null), 12000);
+    };
+
+    socket.on('cross_delivery_confirmed', handleCrossDeliveryConfirmed);
+    socket.on('partnership_relay_confirmed', handleCrossDeliveryConfirmed);
+
+    socket.on('fleet_same_direction_summary', (data: { count: number; pairs: any[] }) => {
+      setSameDirectionSummary(data);
     });
 
     return () => {
@@ -569,6 +764,11 @@ export function useSocketDrivers(initialMockDrivers: Driver[]) {
       socket.off('driver_application_rejected');
       socket.off('roadside_breakdown_alert');
       socket.off('locked_dashcam_evidence');
+      socket.off('driver_availability_updated');
+      socket.off('driver_deadzone_status');
+      socket.off('cross_delivery_available');
+      socket.off('cross_delivery_confirmed');
+      socket.off('fleet_same_direction_summary');
       clearInterval(pendingPollInterval);
     };
   }, [crashAlertDriver, refreshPendingDrivers]);
@@ -617,6 +817,27 @@ export function useSocketDrivers(initialMockDrivers: Driver[]) {
     setNewRequestToast(null);
   };
 
+  const toggleDriverAvailability = (driverId: string, isAvailable: boolean) => {
+    setLiveDrivers(prev =>
+      prev.map(d => (d.id === driverId || d.userId === driverId) ? { ...d, isAvailable, isAvailableForRescue: isAvailable } : d)
+    );
+    socket.emit('admin_set_driver_availability', { driverId, isAvailable });
+  };
+
+  const toggleDriverDeadZone = (driverId: string, isDeadZone: boolean) => {
+    setLiveDrivers(prev =>
+      prev.map(d => (d.id === driverId || d.userId === driverId) ? { ...d, isDeadZone } : d)
+    );
+    socket.emit('admin_toggle_driver_deadzone', { driverId, isDeadZone });
+  };
+
+  const initiateCrossDelivery = (driverId: string, orderDetails?: any) => {
+    socket.emit('initiate_cross_delivery_handover', {
+      troubledDriverId: driverId,
+      ...orderDetails,
+    });
+  };
+
   return {
     liveDrivers,
     livePotholes,
@@ -655,6 +876,16 @@ export function useSocketDrivers(initialMockDrivers: Driver[]) {
     newRequestToast,
     dismissNewRequestToast,
     refreshPendingDrivers,
+    driverSafeToast,
+    dismissDriverSafeToast,
+    // Cross Delivery & Driver Admin Controls
+    toggleDriverAvailability,
+    toggleDriverDeadZone,
+    initiateCrossDelivery,
+    crossDeliveryOffer,
+    crossDeliveryToast,
+    dismissCrossDeliveryToast,
+    sameDirectionSummary,
   };
 }
 
@@ -737,6 +968,7 @@ function createNewLiveDriver(data: any): Driver {
     emergencyRelationship: data.emergencyRelationship || data.familyRelationship || 'Parent / Guardian',
     appliedVehicle: data.appliedVehicle || data.vehicleName || 'Tata Ace Gold EV',
     licenseNumber: data.licenseNumber || '',
+    isDeadZone: data.isDeadZone ?? false,
     recommendation: 'Handshake complete.',
   };
 }
@@ -799,6 +1031,7 @@ export function deduplicateDrivers(drivers: Driver[]): Driver[] {
         location: validLocation,
         speed: d.speed !== undefined ? d.speed : existing.speed,
         safetyScore: d.safetyScore ?? existing.safetyScore ?? 100,
+        isDeadZone: (d as any).isDeadZone !== undefined ? (d as any).isDeadZone : (existing as any).isDeadZone,
       };
       map.set(foundKey, merged);
     } else {

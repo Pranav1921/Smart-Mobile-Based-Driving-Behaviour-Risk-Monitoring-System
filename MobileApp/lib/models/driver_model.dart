@@ -43,6 +43,10 @@ class DriverProfile {
   // Alias for safetyScore
   double get safetyScore => currentSafetyScore;
 
+  // Compatibility aliases
+  String get phone => phoneNumber;
+  String get vehicleNumber => vehiclePlateNumber;
+
   DriverProfile({
     required this.name,
     this.email = '',

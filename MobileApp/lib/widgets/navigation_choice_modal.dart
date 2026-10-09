@@ -8,6 +8,7 @@ import 'package:mobile_app/providers/trip_provider.dart';
 import 'package:mobile_app/providers/auth_provider.dart';
 import 'package:mobile_app/services/haptic_service.dart';
 import 'package:mobile_app/services/map_navigation_service.dart';
+import 'package:mobile_app/services/floating_overlay_service.dart';
 
 class NavigationChoiceModal {
   static void show(BuildContext context, DeliveryOrder order) {
@@ -257,6 +258,17 @@ class _NavigationChoiceSheet extends StatelessWidget {
                 regionId: auth.profile.regionId,
               );
 
+              // Show Draggable Floating Delivery Bubble Overlay on Screen
+              FloatingOverlayService.show(
+                context: context,
+                order: order,
+                currentSpeed: trip.currentSpeed,
+                safetyScore: trip.overallSafetyScore,
+                onReturnToApp: () {
+                  // Already inside app, just refocus
+                },
+              );
+
               // Launch Google Maps route navigation
               await MapNavigationService.openGoogleMaps(
                 originLat: trip.currentLat,
@@ -264,6 +276,7 @@ class _NavigationChoiceSheet extends StatelessWidget {
                 destLat: order.dropLat,
                 destLng: order.dropLng,
                 address: order.dropAddress,
+                order: order,
                 context: context,
               );
             },

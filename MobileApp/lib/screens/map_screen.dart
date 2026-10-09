@@ -9,6 +9,9 @@ import 'package:mobile_app/services/chatbot_service.dart';
 import 'package:mobile_app/services/gps_service.dart';
 import 'package:mobile_app/services/map_navigation_service.dart';
 import 'package:mobile_app/screens/rules_rewards_screen.dart';
+import 'package:mobile_app/routes/app_routes.dart';
+import 'package:mobile_app/providers/auth_provider.dart';
+import 'package:mobile_app/widgets/realistic_vehicle_map_marker.dart';
 import 'package:url_launcher/url_launcher.dart' as url_launcher;
 
 class MapScreen extends StatefulWidget {
@@ -85,6 +88,7 @@ class _MapScreenState extends State<MapScreen> {
   @override
   Widget build(BuildContext context) {
     final trip = Provider.of<TripProvider>(context);
+    final auth = Provider.of<AuthProvider>(context, listen: false);
     final activeOrder = trip.activeOrder;
 
     final LatLng activePos = _myExactLocation ??
@@ -200,92 +204,16 @@ class _MapScreenState extends State<MapScreen> {
                   // Active Driver Location Marker (with driver name badge)
                   Marker(
                     point: activePos,
-                    width: activeOrder != null ? 150 : 50,
-                    height: activeOrder != null ? 76 : 50,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (activeOrder != null)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                            margin: const EdgeInsets.only(bottom: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF0F172A),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: const Color(0xFF10B981), width: 1.5),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.3),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.delivery_dining_rounded, color: Color(0xFF10B981), size: 12),
-                                const SizedBox(width: 4),
-                                ConstrainedBox(
-                                  constraints: const BoxConstraints(maxWidth: 110),
-                                  child: Text(
-                                    activeOrder.driverName,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 9.5,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: const Color(0xFF10B981).withOpacity(0.25),
-                              ),
-                            ),
-                            Container(
-                              width: 28,
-                              height: 28,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.white,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.2),
-                                    blurRadius: 6,
-                                    offset: const Offset(0, 2),
-                                  )
-                                ],
-                              ),
-                              child: Center(
-                                child: Container(
-                                  width: 18,
-                                  height: 18,
-                                  decoration: const BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: Color(0xFF10B981),
-                                  ),
-                                  child: const Icon(
-                                    Icons.navigation_rounded,
-                                    color: Colors.white,
-                                    size: 12,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                    width: 80,
+                    height: 90,
+                    child: RealisticVehicleMapMarker(
+                      vehicleType: auth.profile.vehicleType,
+                      vehicleName: auth.profile.vehicleName,
+                      heading: trip.currentHeading,
+                      driverName: auth.profile.name.isNotEmpty ? auth.profile.name : activeOrder?.driverName,
+                      isDeadZone: trip.isDeadZoneActive,
+                      isEmergency: trip.showSOSConfirmation,
+                      size: 58,
                     ),
                   ),
 
@@ -913,7 +841,10 @@ class _MapScreenState extends State<MapScreen> {
             bottom: activeOrder != null ? 320 : 170,
             right: 24,
             child: GestureDetector(
-              onTap: () => trip.triggerManualSOS(),
+              onTap: () {
+                trip.triggerManualSOS();
+                Navigator.pushNamed(context, AppRoutes.crash);
+              },
               child: Container(
                 height: 56,
                 width: 56,
@@ -1189,7 +1120,7 @@ class _MapScreenState extends State<MapScreen> {
                                           const SizedBox(width: 8),
                                           Expanded(
                                             child: Text(
-                                              "Delivered! +₹${(completedTrip.payout ?? 0.0).toInt()} & +${completedTrip.pointsEarned} PTS Added",
+                                              "Delivered! +₹${(completedTrip.payout ?? 0.0).toInt()} & +${completedTrip.pointsEarned} PTS (${completedTrip.safetyScore.toInt()}% Safe Driving Bonus)",
                                               style: const TextStyle(fontWeight: FontWeight.w700),
                                             ),
                                           ),
@@ -1327,6 +1258,7 @@ class _MapScreenState extends State<MapScreen> {
                             ),
                             onPressed: () {
                               trip.triggerManualSOS();
+                              Navigator.pushNamed(context, AppRoutes.crash);
                             },
                             icon: const Icon(Icons.emergency_rounded, size: 18),
                             label: const Text(
@@ -1399,3 +1331,4 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 }
+

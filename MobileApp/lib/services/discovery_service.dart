@@ -58,7 +58,7 @@ class DiscoveryService {
     if (!forceRefresh) {
       final cached = prefs.getString(_keyCachedHost);
       if (cached != null && cached.isNotEmpty) {
-        if (await probeHealth(cached, timeoutMs: 400)) {
+        if (await probeHealth(cached, timeoutMs: 800)) {
           print('[AutoDiscovery] ⚡ Cached backend host verified: $cached');
           _activeHost = cached;
           return cached;
@@ -66,7 +66,7 @@ class DiscoveryService {
       }
     }
 
-    // ── Phase 2: Probe Known Candidate IPs (< 300ms) ──────────
+    // ── Phase 2: Probe Known Candidate IPs (< 1200ms) ──────────
     final quickCandidates = <String>[];
     for (final ip in AppUrls.fallbackCandidateIps) {
       quickCandidates.add("http://$ip:3000");
@@ -81,7 +81,7 @@ class DiscoveryService {
     // Check fast parallel candidates
     final quickResults = await Future.wait(
       quickCandidates.map((host) async {
-        final ok = await probeHealth(host, timeoutMs: 350);
+        final ok = await probeHealth(host, timeoutMs: 1200);
         return ok ? host : null;
       }),
     );

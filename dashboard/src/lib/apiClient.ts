@@ -14,11 +14,19 @@ async function getValidJwtToken(forceRefresh = false): Promise<string | null> {
 
   if (isMockToken || forceRefresh) {
     try {
-      const loginRes = await fetch(`${API_BASE_URL}/auth/login`, {
+      let loginRes = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: 'admin@smartdrive.ai', password: 'SmartDrive2026!' }),
       });
+      if (!loginRes.ok) {
+        // Fallback to secondary seeded admin if primary is unavailable
+        loginRes = await fetch(`${API_BASE_URL}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: 'admin@acmelogistics.com', password: 'SmartDrive2026!' }),
+        });
+      }
       if (loginRes.ok) {
         const loginJson = await loginRes.json();
         token = loginJson.data?.accessToken || loginJson.accessToken || null;
@@ -57,9 +65,10 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Re
   return res;
 }
 
-export async function fetchDriversFromApi(): Promise<Driver[]> {
+export async function fetchDriversFromApi(zone?: string): Promise<Driver[]> {
   try {
-    const res = await fetchWithAuth(`${API_BASE_URL}/drivers`);
+    const query = zone && zone !== 'all' ? `?zone=${encodeURIComponent(zone)}` : '';
+    const res = await fetchWithAuth(`${API_BASE_URL}/drivers${query}`);
     if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
     const json = await res.json();
     const list = json.data || [];
@@ -67,6 +76,34 @@ export async function fetchDriversFromApi(): Promise<Driver[]> {
   } catch (err) {
     console.error('Failed to fetch drivers:', err);
     return [];
+  }
+}
+
+export async function deleteDriverFromApi(id: string): Promise<boolean> {
+  try {
+    const res = await fetchWithAuth(`${API_BASE_URL}/drivers/${id}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+    return true;
+  } catch (err) {
+    console.error('Failed to delete driver:', err);
+    throw err;
+  }
+}
+
+export async function updateDriverInApi(id: string, data: any): Promise<any> {
+  try {
+    const res = await fetchWithAuth(`${API_BASE_URL}/drivers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+    const json = await res.json();
+    return json.data;
+  } catch (err) {
+    console.error('Failed to update driver:', err);
+    throw err;
   }
 }
 export async function fetchPendingDrivers(zone?: string): Promise<any[]> {
@@ -181,18 +218,6 @@ export async function fetchCrashReportById(id: string): Promise<any> {
   } catch (err) {
     console.warn('Crash API fetch failed:', err);
     return null;
-  }
-}
-
-export async function deleteDriverFromApi(id: string): Promise<boolean> {
-  try {
-    const res = await fetchWithAuth(`${API_BASE_URL}/drivers/${id}`, {
-      method: 'DELETE',
-    });
-    return res.ok;
-  } catch (err) {
-    console.error('Failed to delete driver:', err);
-    return false;
   }
 }
 

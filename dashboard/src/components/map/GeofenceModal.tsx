@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Shield, X, MapPin, Gauge, CircleDot, CheckCircle2, School, ShoppingBag, HeartPulse, CornerUpRight, Construction } from 'lucide-react'
+import { Shield, X, MapPin, Gauge, CircleDot, CheckCircle2, School, ShoppingBag, HeartPulse, CornerUpRight, Construction, Radio, WifiOff } from 'lucide-react'
 import { GeofenceZone, GEOFENCE_PRESETS } from '@/types/geofence'
 import { cn } from '@/lib/utils'
 
@@ -19,13 +19,20 @@ export function GeofenceModal({
   initialCoords = [12.7749, 75.2023],
   activeRegionId = 'puttur_taluk'
 }: GeofenceModalProps) {
-  const [selectedType, setSelectedType] = useState<GeofenceZone['type']>('school')
-  const [name, setName] = useState('New Safety Speed Restriction Zone')
-  const [speedLimit, setSpeedLimit] = useState(25)
-  const [radiusMeters, setRadiusMeters] = useState(250)
+  const [selectedType, setSelectedType] = useState<GeofenceZone['type']>('deadzone')
+  const [name, setName] = useState('Cellular Dead Zone / Ghat Blackout')
+  const [speedLimit, setSpeedLimit] = useState(40)
+  const [radiusMeters, setRadiusMeters] = useState(600)
   const [lat, setLat] = useState(initialCoords[0])
   const [lng, setLng] = useState(initialCoords[1])
-  const [color, setColor] = useState('#38bdf8')
+  const [color, setColor] = useState('#06b6d4')
+
+  React.useEffect(() => {
+    if (initialCoords && initialCoords[0] && initialCoords[1]) {
+      setLat(initialCoords[0])
+      setLng(initialCoords[1])
+    }
+  }, [initialCoords?.[0], initialCoords?.[1], isOpen])
 
   if (!isOpen) return null
 

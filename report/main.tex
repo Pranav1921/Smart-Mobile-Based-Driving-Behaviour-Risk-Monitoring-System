@@ -1,0 +1,575 @@
+\documentclass[12pt]{report}
+
+% ============================================================
+% BODY FORMATTING -- per the official Phase-1 Report Guidelines:
+%  - A4 paper, margins L 1.25in, R 1in, T/B 0.75in
+%  - 1.5 line spacing throughout
+%  - Chapter number ("CHAPTER N"): 16pt, RIGHT justified
+%  - Chapter title: 18pt, centered
+%  - Section number+heading: 14pt, left justified, UPPERCASE
+%  - Sub-section number+heading: 12pt, left justified
+%  - Body text: 12pt, fully justified
+%  - 10pt spacing between paragraphs
+%  - No paragraph indentation
+% ============================================================
+
+\usepackage[a4paper,
+  includehead,
+  includefoot,
+  left=1.25in,
+  right=1in,
+  top=0.75in,
+  bottom=0.75in,
+  headheight=22pt,
+  headsep=12pt,
+  footskip=30pt
+]{geometry}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{setspace}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{fancyhdr}
+\usepackage{iftex}
+\usepackage{graphicx}
+\usepackage{longtable}
+\usepackage{listings}
+\usepackage{tikz}
+\usepackage{float}
+\usepackage{amsmath, amssymb, amsfonts}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{cite}
+\usepackage[hidelinks, colorlinks=true, linkcolor=vcetmaroon, citecolor=vcetmaroon, urlcolor=vcetmaroon]{hyperref}
+\usetikzlibrary{positioning,arrows.meta}
+
+% ============================================================
+% TIMES NEW ROMAN FONT SETUP
+% ============================================================
+
+\ifPDFTeX
+  % pdfLaTeX
+  \usepackage{times}
+\else
+  % XeLaTeX / LuaLaTeX
+  \usepackage{fontspec}
+  \setmainfont{Times New Roman}
+\fi
+
+% ============================================================
+% PARAGRAPH FORMATTING
+% ============================================================
+
+\onehalfspacing
+
+% No paragraph indentation
+\setlength{\parindent}{0pt}
+
+% 10pt spacing between paragraphs
+\setlength{\parskip}{10pt}
+
+% ============================================================
+% PREVENT WORDS FROM BEING SPLIT WITH HYPHENS
+% ============================================================
+
+\usepackage[none]{hyphenat}
+
+% Improve justification and character spacing
+\usepackage{microtype}
+
+% Tell LaTeX to adjust spacing rather than break words
+\hyphenpenalty=10000
+\exhyphenpenalty=10000
+
+% Give LaTeX additional flexibility for justified paragraphs
+\emergencystretch=3em
+
+% ============================================================
+% MAROON COLOUR
+% ============================================================
+
+\definecolor{vcetmaroon}{RGB}{99,36,35}
+
+% ============================================================
+% GRAPHICS PATH & SAFE IMAGE FALLBACK
+% If an image is missing, render a neat box instead of aborting compile
+% ============================================================
+
+\graphicspath{{figures/}{./}}
+
+\makeatletter
+\let\oldincludegraphics\includegraphics
+\renewcommand{\includegraphics}[2][]{%
+  \IfFileExists{#2}{%
+    \oldincludegraphics[#1]{#2}%
+  }{%
+    \IfFileExists{figures/#2}{%
+      \oldincludegraphics[#1]{figures/#2}%
+    }{%
+      \fbox{\parbox[c][2.2cm][c]{0.7\linewidth}{\centering\small\bfseries\color{vcetmaroon}[Image File Missing: #2]}}%
+    }%
+  }%
+}
+\makeatother
+
+% ============================================================
+% LISTINGS CONFIGURATION
+% ============================================================
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  keywordstyle=\bfseries\color{vcetmaroon},
+  commentstyle=\color{gray!80!black},
+  stringstyle=\color{teal},
+  showstringspaces=false
+}
+
+% ============================================================
+% HEADER / FOOTER CONTENT
+% ============================================================
+
+\newcommand{\reporttitle}
+{Smart Mobile-Based Driving Behaviour \& Risk Monitoring System}
+
+\newcommand{\reportyear}
+{2026-27}
+
+\newcommand{\deptline}
+{Department of CSE (Data Science), VCET, Puttur}
+
+% ============================================================
+% HEADER / FOOTER
+% ============================================================
+
+\pagestyle{fancy}
+
+\fancyhf{}
+
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+\fancyhead[L]{%
+  \hspace*{0pt}%
+  \normalfont\fontsize{11}{13}\selectfont
+  \reporttitle
+}
+
+\fancyhead[R]{%
+  \hspace*{5pt}%
+  \normalfont\fontsize{11}{13}\selectfont
+  \reportyear
+}
+
+\fancyfoot[L]{%
+  \hspace*{0pt}%
+  \normalfont\fontsize{11}{13}\selectfont
+  \deptline
+}
+
+\fancyfoot[R]{%
+  \hspace*{5pt}%
+  \normalfont\fontsize{11}{13}\selectfont
+  Page \thepage
+}
+
+% ============================================================
+% DOUBLE RULE BELOW HEADER
+% ============================================================
+
+\renewcommand{\headrule}{%
+  {\color{vcetmaroon}
+   \hrule height 0.6pt width \headwidth}%
+  \vskip 1pt
+  {\color{vcetmaroon}
+   \hrule height 3pt width \headwidth}%
+}
+
+% ============================================================
+% DOUBLE RULE ABOVE FOOTER
+% ============================================================
+
+\renewcommand{\footrule}{%
+  {\color{vcetmaroon}
+   \hrule height 3pt width \headwidth}%
+  \vskip 1pt
+  {\color{vcetmaroon}
+   \hrule height 0.6pt width \headwidth}%
+}
+
+% ============================================================
+% PLAIN PAGE STYLE
+% ============================================================
+
+\fancypagestyle{plain}{%
+  \fancyhf{}
+
+  \fancyhead[L]{
+    \normalfont
+    \fontsize{11}{13}
+    \selectfont
+    \reporttitle
+  }
+
+  \fancyhead[R]{
+    \normalfont
+    \fontsize{11}{13}
+    \selectfont
+    \reportyear
+  }
+
+  \fancyfoot[L]{
+    \normalfont
+    \fontsize{11}{13}
+    \selectfont
+    \deptline
+  }
+
+  \fancyfoot[R]{
+    \normalfont
+    \fontsize{11}{13}
+    \selectfont
+    Page \thepage
+  }
+
+  \renewcommand{\headrulewidth}{0pt}
+  \renewcommand{\footrulewidth}{0pt}
+
+  \renewcommand{\headrule}{%
+    {\color{vcetmaroon}
+     \hrule height 0.6pt width \headwidth}%
+    \vskip 1pt
+    {\color{vcetmaroon}
+     \hrule height 3pt width \headwidth}%
+  }
+
+  \renewcommand{\footrule}{%
+    {\color{vcetmaroon}
+     \hrule height 3pt width \headwidth}%
+    \vskip 1pt
+    {\color{vcetmaroon}
+     \hrule height 0.6pt width \headwidth}%
+  }
+}
+
+% ============================================================
+% CHAPTER FORMAT
+% ============================================================
+
+\titleformat{\chapter}[display]
+  {\bfseries\fontsize{16}{0}\selectfont\raggedleft}
+  {CHAPTER \thechapter}
+  {0pt}
+  {\centering\bfseries\fontsize{18}{20}\selectfont}
+
+\titlespacing*{\chapter}
+  {0pt}
+  {-10pt}
+  {10pt}
+
+% ============================================================
+% SECTION FORMAT
+% ============================================================
+
+\titleformat{\section}
+  {\normalfont\bfseries\fontsize{14}{19}\selectfont}
+  {\thesection}
+  {10pt}
+  {\MakeUppercase}
+
+\titlespacing*{\section}
+  {0pt}
+  {0pt}
+  {5pt}
+
+% ============================================================
+% SUBSECTION FORMAT
+% ============================================================
+
+\titleformat{\subsection}
+  {\normalfont\bfseries\fontsize{12}{17}\selectfont}
+  {\thesubsection}
+  {10pt}
+  {}
+
+\titlespacing*{\subsection}
+  {0pt}
+  {10pt}
+  {-5pt}
+
+\makeatletter
+\renewcommand\@secpenalty{-50}
+\makeatother
+
+% ============================================================
+% DOCUMENT
+% ============================================================
+
+\begin{document}
+
+% ------------------------------------------------------------------------------
+% PAGE 1: TITLE PAGE
+% ------------------------------------------------------------------------------
+\begin{titlepage}
+    \centering
+    {\large \textbf{\textcolor{vcetmaroon}{VISVESVARAYA TECHNOLOGICAL UNIVERSITY}}}\\[0.15cm]
+    {\normalsize \textbf{JNANA SANGAMA, BELAGAVI -- 590 018, KARNATAKA, INDIA}}\\[0.6cm]
+    
+    \includegraphics[width=2.5cm]{figures/vtu_logo.png}\\[0.5cm]
+    
+    {\large \textbf{A PROJECT REPORT (PHASE-1)}}\\[0.1cm]
+    {\normalsize \textbf{ON}}\\[0.25cm]
+    {\Large \textbf{\textcolor{vcetmaroon}{``SMART MOBILE-BASED DRIVING BEHAVIOUR \& RISK MONITORING SYSTEM''}}}\\[0.5cm]
+    
+    {\normalsize Submitted in partial fulfillment of the requirements for the award of}\\[0.12cm]
+    {\large \textbf{BACHELOR OF ENGINEERING}}\\[0.08cm]
+    {\normalsize in}\\[0.08cm]
+    {\large \textbf{CSE (DATA SCIENCE)}}\\[0.5cm]
+    
+    {\normalsize \textbf{Submitted By}}\\[0.2cm]
+    \begin{tabular}{cc}
+        \textbf{Name} & \textbf{USN} \\
+        PRANAV K U & [4VP23CD0XX] \\
+        \lbrack Candidate Name 2\rbrack & \lbrack USN 2\rbrack \\
+        \lbrack Candidate Name 3\rbrack & \lbrack USN 3\rbrack \\
+        \lbrack Candidate Name 4\rbrack & \lbrack USN 4\rbrack \\
+    \end{tabular}\\[0.5cm]
+    
+    {\normalsize \textbf{Under the Guidance of}}\\[0.1cm]
+    {\large \textbf{\lbrack Guide Name\rbrack}}\\[0.05cm]
+    {\normalsize \lbrack Designation\rbrack, Department of CSE (Data Science)}\\[0.5cm]
+    
+    \includegraphics[width=2.2cm]{figures/vcet_logo.png}\\[0.35cm]
+    
+    {\large \textbf{\textcolor{vcetmaroon}{DEPARTMENT OF CSE (DATA SCIENCE)}}}\\[0.1cm]
+    {\normalsize \textbf{VIVEKANANDA COLLEGE OF ENGINEERING \& TECHNOLOGY}}\\[0.05cm]
+    {\footnotesize [A Unit of Vivekananda Vidyavardhaka Sangha, Puttur (R)]}\\[0.05cm]
+    {\footnotesize Affiliated to Visvesvaraya Technological University and Approved by AICTE New Delhi \& Govt. of Karnataka}\\[0.05cm]
+    {\footnotesize Nehru Nagara, Puttur -- 574 203, DK, Karnataka, India}\\[0.1cm]
+    {\normalsize \textbf{Academic Year 2026 -- 2027}}
+\end{titlepage}
+
+% ------------------------------------------------------------------------------
+% PAGE 2: CERTIFICATE
+% ------------------------------------------------------------------------------
+\newpage
+\thispagestyle{empty}
+\begin{center}
+    {\large \textbf{\textcolor{vcetmaroon}{VIVEKANANDA COLLEGE OF ENGINEERING \& TECHNOLOGY}}}\\[0.05cm]
+    {\footnotesize [A Unit of Vivekananda Vidyavardhaka Sangha, Puttur (R)]}\\[0.05cm]
+    {\footnotesize Affiliated to Visvesvaraya Technological University and Approved by AICTE New Delhi \& Govt. of Karnataka}\\[0.05cm]
+    {\footnotesize Nehru Nagara, Puttur -- 574 203, DK, Karnataka, India}\\[0.25cm]
+    
+    {\normalsize \textbf{\textcolor{vcetmaroon}{DEPARTMENT OF CSE (DATA SCIENCE)}}}\\[0.25cm]
+    
+    \includegraphics[width=2.1cm]{figures/vcet_logo.png}\\[0.25cm]
+    
+    {\Large \textbf{CERTIFICATE}}\\[0.35cm]
+\end{center}
+
+\noindent Certified that the project work entitled \textbf{``Smart Mobile-Based Driving Behaviour \& Risk Monitoring System''} is carried out by \textbf{PRANAV K U, \lbrack Candidate Name 2\rbrack, \lbrack Candidate Name 3\rbrack, and \lbrack Candidate Name 4\rbrack} bearing USNs \textbf{\lbrack USN 1\rbrack, \lbrack USN 2\rbrack, \lbrack USN 3\rbrack\ and \lbrack USN 4\rbrack}, respectively bonafide students of \textbf{Vivekananda College of Engineering \& Technology}, in partial fulfillment for the award of \textbf{Bachelor of Engineering in CSE (Data Science)} of the \textbf{Visvesvaraya Technological University, Belagavi} during the year 2026-27. It is certified that all corrections / suggestions indicated for Internal Assessment have been incorporated in the report deposited in the departmental library.
+
+\vspace{0.3cm}
+\noindent The project report has been approved as it satisfies the academic requirements in respect of Project work prescribed for the said Degree.
+
+\vspace{1.2cm}
+\noindent
+\begin{minipage}{0.32\textwidth}
+    \centering
+    \textbf{Signature of Guide}\\
+    \textbf{\lbrack Guide Name\rbrack}\\
+    \lbrack Designation\rbrack
+\end{minipage}
+\hfill
+\begin{minipage}{0.32\textwidth}
+    \centering
+    \textbf{Signature of HOD}\\
+    \textbf{\lbrack HOD Name\rbrack}\\
+    Head of Department
+\end{minipage}
+\hfill
+\begin{minipage}{0.32\textwidth}
+    \centering
+    \textbf{Signature of Principal}\\
+    \textbf{\lbrack Principal Name\rbrack}\\
+    Principal
+\end{minipage}
+
+\vspace{1.2cm}
+\begin{center}
+    \textbf{\large EXTERNAL VIVA}
+\end{center}
+\vspace{0.2cm}
+\noindent
+\begin{tabularx}{\textwidth}{lX}
+    \textbf{Name of the Examiners} & \textbf{Signature with date} \\[0.5cm]
+    1. ............................................................ & .................................................... \\[0.5cm]
+    2. ............................................................ & .................................................... \\
+\end{tabularx}
+
+% ------------------------------------------------------------------------------
+% PAGE 3: DECLARATION
+% ------------------------------------------------------------------------------
+\newpage
+\thispagestyle{empty}
+\begin{center}
+    {\Large \textbf{DECLARATION}}\\[0.6cm]
+\end{center}
+
+\noindent We, \textbf{PRANAV K U\ (\lbrack USN 1\rbrack), \lbrack Candidate Name 2\rbrack\ (\lbrack USN 2\rbrack), \lbrack Candidate Name 3\rbrack\ (\lbrack USN 3\rbrack)\ and \lbrack Candidate Name 4\rbrack\ (\lbrack USN 4\rbrack)} students of seventh semester B.E. in \textbf{CSE (Data Science)}, Vivekananda College of Engineering \& Technology, Puttur, hereby declare that the project work entitled \textbf{``Smart Mobile-Based Driving Behaviour \& Risk Monitoring System''} has been carried out and duly executed by us at VCET, Puttur, under the guidance of \textbf{\lbrack Guide Name\rbrack}, \lbrack Designation\rbrack, Department of CSE (Data Science), Vivekananda College of Engineering \& Technology, Puttur, and submitted in partial fulfillment of the requirements for the award of degree in \textbf{Bachelor of Engineering in CSE (Data Science)} by \textbf{Visvesvaraya Technological University, Belagavi} during the academic year 2026-27.
+
+\vspace{1.0cm}
+\noindent
+\begin{tabularx}{\textwidth}{|p{5.5cm}|p{4.5cm}|X|}
+    \hline
+    \textbf{Name of the Students} & \textbf{USN} & \textbf{Signature with date} \\
+    \hline
+    PRANAV K U & [4VP23CD0XX] & \\
+    \hline
+    \lbrack Candidate Name 2\rbrack & \lbrack USN 2\rbrack & \\
+    \hline
+    \lbrack Candidate Name 3\rbrack & \lbrack USN 3\rbrack & \\
+    \hline
+    \lbrack Candidate Name 4\rbrack & \lbrack USN 4\rbrack & \\
+    \hline
+\end{tabularx}
+
+\vspace{1.2cm}
+\noindent
+\begin{minipage}{0.45\textwidth}
+    Date: October 2026\\
+    Place: Puttur
+\end{minipage}
+
+% ------------------------------------------------------------------------------
+% PAGE 4: ABSTRACT
+% ------------------------------------------------------------------------------
+\newpage
+\thispagestyle{empty}
+\begin{center}
+    {\Large \textbf{ABSTRACT}}\\[0.5cm]
+\end{center}
+
+\noindent In recent years, the rapid growth of vehicular transport has made road safety an escalating global concern due to accidents caused by unsafe driving behaviors such as overspeeding, harsh braking, sudden acceleration, and distracted driving. Traditional monitoring systems rely on manual supervision or expensive OBD-II hardware installations that lack scalability. The project titled \textbf{``Smart Mobile-Based Driving Behaviour \& Risk Monitoring System''} addresses these challenges by combining smartphone-based sensing, dedicated external edge IMU sensors (ESP32 + MPU-6050), and cloud analytics. The system samples 3D kinematics at 20~Hz, applies spatial downsampling, and classifies events using machine learning models to generate real-time driver safety scores, visualized on an interactive web dashboard.
+
+\vspace{0.4cm}
+\noindent By rigidly mounting the ESP32 node to the vehicle chassis, the platform eliminates the 2.0g to 3.5g false acceleration spikes typically caused by phone rattling in cup holders. The collected telemetry is transmitted over a 20-byte packed binary BLE GATT packet to a mobile gateway, which enforces a 3-meter spatial delta filter. A FastAPI cloud microservice filters incoming signals through an Adaptive Exponential Moving Average (EMA) filter, followed by Random Forest classification achieving \textbf{94.8\% accuracy}. A distance-normalized exponential decay engine assigns an objective 0--100 safety score, visualized on a real-time React 18 GIS fleet command center with automated collision SOS dispatch.
+
+% ------------------------------------------------------------------------------
+% PAGE 5: ACKNOWLEDGEMENT
+% ------------------------------------------------------------------------------
+\newpage
+\thispagestyle{empty}
+\begin{center}
+    {\Large \textbf{ACKNOWLEDGEMENT}}\\[0.5cm]
+\end{center}
+
+\noindent We take this opportunity to express our deep heartfelt gratitude to all those people who have helped us in the successful completion of the project.
+
+\vspace{0.3cm}
+\noindent First and foremost, we would like to express sincere gratitude towards our guide \textbf{\lbrack Guide Name\rbrack}, \lbrack Designation\rbrack, for providing excellent guidance, encouragement and inspiration throughout the project work. Without his invaluable guidance, this work would never have been a successful one.
+
+\vspace{0.3cm}
+\noindent We would like to express our sincere gratitude to the Head of the Department of CSE (Data Science), \textbf{\lbrack HOD Name\rbrack} for guidance, support and encouragement.
+
+\vspace{0.3cm}
+\noindent We would like to thank our Principal \textbf{\lbrack Principal Name\rbrack} for providing all the laboratory facilities and an excellent academic environment to work in the college campus.
+
+\vspace{0.3cm}
+\noindent We are extremely grateful to the Management of \textbf{Vivekananda College of Engineering \& Technology, Puttur} for their constant support and inspiration.
+
+\vspace{0.3cm}
+\noindent We are thankful to all the teaching and non-teaching staff members of the Department of CSE (Data Science) for their help and needed support rendered throughout the project.
+
+% ------------------------------------------------------------------------------
+% PRELIMINARY LISTS (Separate Sections on dedicated pages)
+% ------------------------------------------------------------------------------
+\newpage
+\pagenumbering{roman}
+\setcounter{page}{1}
+
+\tableofcontents
+\newpage
+\listoffigures
+\newpage
+\listoftables
+\newpage
+
+\chapter*{List of Abbreviations}
+\addcontentsline{toc}{chapter}{List of Abbreviations}
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{lX}
+\toprule
+\textbf{Acronym} & \textbf{Expansion} \\
+\midrule
+AI & Artificial Intelligence \\
+AIoT & Artificial Intelligence of Things \\
+BLE & Bluetooth Low Energy \\
+CAN & Controller Area Network \\
+CNN & Convolutional Neural Network \\
+DLPF & Digital Low-Pass Filter \\
+EMA & Exponential Moving Average \\
+FIFO & First-In, First-Out \\
+GATT & Generic Attribute Profile \\
+GIS & Geographic Information System \\
+GPS & Global Positioning System \\
+HUD & Heads-Up Display \\
+IMU & Inertial Measurement Unit \\
+MEMS & Micro-Electro-Mechanical Systems \\
+OBD-II & On-Board Diagnostics II \\
+REST & Representational State Transfer \\
+SVM & Support Vector Machine \\
+TTC & Time-To-Collision \\
+UBI & Usage-Based Insurance \\
+USN & University Seat Number \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% ------------------------------------------------------------------------------
+% MAIN CHAPTERS (Arabic Numbering starts at Chapter 1)
+% ------------------------------------------------------------------------------
+\newpage
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+\pagestyle{fancy}
+
+% Chapter 1: Introduction
+\IfFileExists{intro.tex}{\input{intro}}{}
+
+% Chapter 2: Literature Survey
+\IfFileExists{LiteratureReview.tex}{\input{LiteratureReview}}{}
+
+% Chapter 3: Requirement Specification
+\IfFileExists{RequirementSpecification.tex}{\input{RequirementSpecification}}{}
+
+% Chapter 4: System Design
+\IfFileExists{SystemDesign.tex}{\input{SystemDesign}}{}
+
+% Chapter 5: System Implementation
+\IfFileExists{SystemImplementation.tex}{\input{SystemImplementation}}{}
+
+% Chapter 6: Testing
+\IfFileExists{Testing.tex}{\input{Testing}}{}
+
+% Chapter 7: Results and Performance Analysis
+\IfFileExists{Results.tex}{\input{Results}}{}
+
+% Chapter 8: Conclusion and Future Scope
+\IfFileExists{Conclusion.tex}{\input{Conclusion}}{}
+
+% References / Bibliography
+\IfFileExists{reference.tex}{\input{reference}}{}
+
+% Personal Profile & Conferences
+\IfFileExists{PersonalProfile.tex}{\input{PersonalProfile}}{}
+
+\end{document}

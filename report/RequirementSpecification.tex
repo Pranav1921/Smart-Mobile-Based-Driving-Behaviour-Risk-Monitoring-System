@@ -1,0 +1,153 @@
+\chapter{Requirement Specification}
+\label{chap:requirements}
+
+\section{Introduction}
+\label{sec:req_intro}
+The formulation of rigorous requirement specifications establishes the technical criteria and functional boundaries required to build the Smart Driving Behaviour Analysis System. This chapter defines the functional requirements (what the system must do), non-functional requirements (the operational constraints and quality attributes), hardware component specifications, and the supporting software engineering stack.
+
+\section{Functional Requirements}
+\label{sec:functional_reqs}
+The functional requirements represent the core behavioral capabilities implemented across the edge hardware, mobile gateway, backend microservice, and web presentation layers.
+
+\subsection{FR-1: High-Frequency Kinematic Telemetry Harvesting}
+The system shall continuously sample the vehicle's tri-axial linear acceleration ($a_x, a_y, a_z$) and tri-axial angular rates ($\omega_x, \omega_y, \omega_z$) at a constant frequency of 20~Hz (50~ms sampling period) via a dedicated, chassis-mounted inertial measurement unit. The hardware node shall convert raw 16-bit analog-to-digital converter (ADC) readings into physical units (G-force and degrees per second) and broadcast them across a local wireless link.
+
+\subsection{FR-2: GPS Trajectory Logging and Spatial Downsampling}
+The mobile application shall harvest spatial coordinates (latitude and longitude in WGS-84 decimal format), ground speed ($v$ in km/h), and compass heading ($\theta \in [0^\circ, 359^\circ]$) from the onboard Global Positioning System (GPS) at a 1~Hz rate. To conserve bandwidth and prevent redundant database writes during vehicle idling or traffic stops, the system shall enforce a spatial delta filter, discarding duplicate coordinates unless the vehicle has traversed a minimum spatial displacement of 3 meters.
+
+\subsection{FR-3: Real-Time Harsh Driving Maneuver Detection}
+The analytical core shall inspect incoming high-frequency telemetry streams to identify and timestamp anomalous driving maneuvers using predefined kinematic thresholds:
+\begin{itemize}
+    \item \textbf{Harsh Braking:} Longitudinal deceleration exceeding $-3.8\text{ m/s}^2$ ($a_x < -0.38g$).
+    \item \textbf{Rapid Acceleration:} Longitudinal acceleration exceeding $+3.2\text{ m/s}^2$ ($a_x > +0.32g$).
+    \item \textbf{Aggressive Swerving and Cornering:} Lateral centrifugal acceleration $\|a_y\| > 9.2\text{ m/s}^2$ with a simultaneous angular yaw rate $\|\omega_z\| > 3.6\text{ rad/s}$ while vehicle speed $v \ge 28\text{ km/h}$.
+    \item \textbf{Overspeeding Infractions:} Vehicle transit velocity exceeding designated road-segment speed thresholds by $\ge 10\text{ km/h}$.
+\end{itemize}
+
+\subsection{FR-4: Vertical-Dominant Road Surface Defect Detection}
+The system shall identify road hazards (potholes and severe bumps) by isolating abrupt vertical Z-axis shockwaves that satisfy vertical dominance conditions:
+\begin{equation}
+    |a_z| \ge 1.90g \quad \text{and} \quad |a_z| > 1.25 \cdot \sqrt{a_x^2 + a_y^2}
+\end{equation}
+provided the vehicle speed $v \ge 12\text{ km/h}$. The system shall tag the hazard with GPS coordinates and enforce a 4-second temporal debounce to eliminate redundant alerts for a single road defect.
+
+\subsection{FR-5: Driver Safety Scoring Engine}
+The backend shall compute a dynamic driver safety score on a continuous scale of 0 to 100 for each trip session. Every trip shall initialize with a 100-point baseline. The engine shall apply distance-normalized penalties based on the frequency and severity of detected infractions. Trips shall be categorized into five operational safety tiers:
+\begin{itemize}
+    \item \textbf{Gold Tier ($95\% - 100\%$):} Exemplary defensive driving.
+    \item \textbf{Silver Tier ($85\% - 94\%$):} Standard safe commercial operation.
+    \item \textbf{Bronze Tier ($75\% - 84\%$):} Cautionary driving with minor infractions.
+    \item \textbf{At-Risk Tier ($60\% - 74\%$):} Elevated risk profile requiring coaching.
+    \item \textbf{Critical Tier ($< 60\%$):} Hazardous operation requiring administrative intervention.
+\end{itemize}
+
+\subsection{FR-6: Fleet Operations GIS Dashboard and Emergency SOS}
+The system shall provide an administrative web dashboard rendering live vehicle locations, heading indicators, color-coded trip breadcrumbs (green for normal cruising, amber for minor anomalies, red for critical maneuvers), and trip score summaries. In the event of a high-G collision pulse ($\Delta V > 35\text{ km/h}$) or a prolonged post-speed immobility anomaly ($>30$ seconds motionless following high speed), the system shall trigger an emergency SOS alert banner with one-click emergency dispatch dialing.
+
+\section{Non-Functional Requirements}
+\label{sec:non_functional_reqs}
+Non-functional requirements specify the architectural qualities, operational constraints, and performance baselines of the system.
+
+\subsection{NFR-1: Real-Time Latency and Throughput}
+\begin{itemize}
+    \item \textbf{Edge-to-Mobile Latency:} Kinematic telemetry transmission over Bluetooth Low Energy (BLE) shall exhibit an end-to-end packet delivery latency of less than 15~ms.
+    \item \textbf{Cloud Processing Latency:} The backend ingestion microservice shall process, validate, and persist telemetry batches within 100~ms at the 95th percentile under normal network conditions.
+    \item \textbf{Dashboard Rendering Latency:} The web fleet tracking interface shall update vehicle marker positions on Leaflet maps within 500~ms of backend state changes.
+\end{itemize}
+
+\subsection{NFR-2: Cloud Scalability and Concurrency}
+The backend shall be architected using asynchronous, non-blocking I/O (ASGI with FastAPI and Uvicorn). The ingestion pipeline shall support horizontal scalability, capable of ingesting concurrent telemetry streams from at least 1,000 active vehicles without dropping packets or exceeding memory constraints.
+
+\subsection{NFR-3: Data Integrity, Security, and Privacy}
+\begin{itemize}
+    \item \textbf{Transmission Security:} All client-to-cloud communication shall be encrypted using Transport Layer Security (TLS 1.3).
+    \item \textbf{Authentication and Access Control:} Cloud API endpoints and administrative dashboard routes shall enforce role-based access control (RBAC) secured via JSON Web Tokens (JWT) signed with HMAC-SHA256.
+    \item \textbf{Edge Data Verification:} Each 20-byte binary telemetry packet transmitted across BLE shall incorporate a 16-bit Cyclic Redundancy Check (CRC16) to verify data integrity against electromagnetic interference.
+\end{itemize}
+
+\subsection{NFR-4: Fault Tolerance and Offline Resilience}
+In rural sectors, mountainous ghats, or vehicular tunnels where cellular connectivity is interrupted, the mobile client shall automatically transition into an offline buffering mode. Telemetry frames shall be retained in a local First-In, First-Out (FIFO) ring buffer and automatically synchronized in batched transactions once cellular network service is re-established.
+
+\subsection{NFR-5: Mobile Device Energy and Rendering Optimization}
+To prevent excessive battery consumption and thermal throttling on the mobile phone, the mobile application shall throttle high-frequency sensor UI redraws to 120~ms (~8.3~Hz) and map coordinate updates to 150~ms (~6.7~Hz). This maintains a steady 60~FPS user interface while cutting CPU utilization by up to 70\%.
+
+\section{Hardware Requirements}
+\label{sec:hardware_reqs}
+The physical hardware implementation utilizes robust, cost-effective embedded modules:
+
+\begin{enumerate}
+    \item \textbf{Microcontroller Unit (ESP32-WROOM-32):}
+    \begin{itemize}
+        \item Processor: Dual-core 32-bit Xtensa LX6 microprocessor operating at 240~MHz.
+        \item Memory: 520~KB internal SRAM, 4~MB external SPI flash memory.
+        \item Wireless Connectivity: Integrated Bluetooth Low Energy (BLE v4.2 BR/EDR) and 2.4~GHz Wi-Fi (802.11 b/g/n).
+        \item Peripherals: Hardware I2C bus operating at 400~kHz Fast Mode for sensor polling.
+    \end{itemize}
+    
+    \item \textbf{Inertial Measurement Unit (InvenSense MPU-6050):}
+    \begin{itemize}
+        \item Architecture: 6-axis MotionTracking device combining a 3-axis MEMS accelerometer and a 3-axis MEMS rate gyroscope on a single silicon die.
+        \item Accelerometer Full-Scale Range: Unlocked via register configuration to $\pm 16g$ ($2048\text{ LSB}/g$).
+        \item Gyroscope Full-Scale Range: Unlocked to $\pm 2000^\circ/\text{s}$ ($16.4\text{ LSB}/(^\circ/\text{s})$).
+        \item Digital Low-Pass Filter (DLPF): Onboard low-pass filter set to 44~Hz accelerometer bandwidth to suppress mechanical engine harmonics.
+    \end{itemize}
+    
+    \item \textbf{Global Positioning System (GPS) Module:}
+    \begin{itemize}
+        \item Module: u-blox NEO-6M high-performance GPS receiver / Smartphone Assisted GPS (A-GPS).
+        \item Update Rate: 1~Hz positional updates with standard NMEA-0183 protocol sentences.
+        \item Positional Accuracy: Horizontal positional accuracy within 2.5~meters CEP.
+    \end{itemize}
+    
+    \item \textbf{Power Supply and Physical Enclosure:}
+    \begin{itemize}
+        \item Power Conversion: High-efficiency DC-DC step-down buck converter stepping vehicle 12V DC auxiliary power to regulated 5V/2A DC.
+        \item Enclosure: Rigid, vibration-resistant ABS enclosure mechanically bolted to the vehicle transmission tunnel or chassis frame.
+    \end{itemize}
+\end{enumerate}
+
+\section{Software Requirements}
+\label{sec:software_reqs}
+The software engineering stack incorporates modern tools, frameworks, and database engines:
+
+\begin{itemize}
+    \item \textbf{Embedded Firmware Development:}
+    \begin{itemize}
+        \item Language: Embedded C++ (C++17 standard).
+        \item Framework / Toolchain: Espressif IoT Development Framework (ESP-IDF) and Arduino IDE with direct register-level I2C read/write primitives.
+    \end{itemize}
+    
+    \item \textbf{Mobile Application Client:}
+    \begin{itemize}
+        \item Framework: Flutter SDK 3.x (Dart 3.x) for cross-platform Android and iOS compilation.
+        \item State Management: Reactive `Provider` pattern for decoupled state synchronization.
+        \item Hardware Plugins: \texttt{flutter\_blue\_plus} for BLE GATT communications and \texttt{geolocator} for high-accuracy GPS streams.
+    \end{itemize}
+    
+    \item \textbf{Backend Cloud Microservices:}
+    \begin{itemize}
+        \item Language / Runtime: Python 3.10+ executed under Uvicorn ASGI server.
+        \item Framework: FastAPI for non-blocking asynchronous RESTful endpoints and automatic OpenAPI documentation.
+        \item Validation: Pydantic v2 data models for rigorous schema enforcement and type checking.
+        \item Object-Relational Mapping (ORM): SQLAlchemy 2.0 with asynchronous session management.
+    \end{itemize}
+    
+    \item \textbf{Machine Learning and Data Science:}
+    \begin{itemize}
+        \item Libraries: \texttt{scikit-learn} for Random Forest and SVM training, \texttt{pandas} and \texttt{numpy} for matrix transformation, and \texttt{scipy.signal} for digital filtering.
+    \end{itemize}
+    
+    \item \textbf{Cloud Broker, Message Queue, and Database:}
+    \begin{itemize}
+        \item Database Engine: PostgreSQL 15 relational time-series database configured with B-tree and composite indexing.
+        \item In-Memory Cache: Redis 7.0 for sub-millisecond caching of live driver states and session metrics.
+        \item Containerization: Docker and Docker Compose for containerized multi-service deployment.
+    \end{itemize}
+    
+    \item \textbf{Web Fleet Operations Dashboard:}
+    \begin{itemize}
+        \item Framework: React 18 with Vite bundling and TypeScript.
+        \item Geospatial Mapping: Leaflet OpenStreetMap GIS with dynamic polyline and custom SVG marker rendering.
+        \item Styling: Modern responsive CSS with TailwindCSS / Vanilla CSS utility classes and Lucide-React icons.
+    \end{itemize}
+\end{itemize}

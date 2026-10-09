@@ -10,6 +10,7 @@ import '../services/haptic_service.dart';
 import '../services/voice_service.dart';
 import '../services/socket_service.dart';
 import '../services/notification_service.dart';
+import '../services/api_service.dart';
 import 'package:uuid/uuid.dart';
 
 enum SensorDeviceStatus {
@@ -241,6 +242,113 @@ class SensorProvider extends ChangeNotifier {
     _currentLng = lng;
   }
 
+  // ── WELFORD'S ONLINE DRIVER BASELINE PROFILING ───────────────────────
+  int _welfordBrakeCount = 0;
+  double _driverBrakeMean = -2.5; // Initial prior m/s^2
+  double _driverBrakeM2 = 0.0;
+  int _welfordAccelCount = 0;
+  double _driverAccelMean = 2.2;
+  double _driverAccelM2 = 0.0;
+
+  double get driverBrakeMean => _driverBrakeMean;
+  double get driverBrakeStd => _welfordBrakeCount > 1 ? sqrt(_driverBrakeM2 / (_welfordBrakeCount - 1)) : 0.5;
+  double get driverAccelMean => _driverAccelMean;
+  double get driverAccelStd => _welfordAccelCount > 1 ? sqrt(_driverAccelM2 / (_welfordAccelCount - 1)) : 0.5;
+
+  // Adaptive personal threshold with bounded safety floor (-6.0 to -3.5 m/s^2)
+  double get dynamicBrakingThreshold {
+    final double candidate = _driverBrakeMean - (2.5 * driverBrakeStd);
+    return candidate.clamp(-6.0, -3.5);
+  }
+
+  void updateDriverBrakeBaseline(double decel) {
+    if (decel > 0) return;
+    _welfordBrakeCount++;
+    final double delta = decel - _driverBrakeMean;
+    _driverBrakeMean += delta / _welfordBrakeCount;
+    final double delta2 = decel - _driverBrakeMean;
+    _driverBrakeM2 += delta * delta2;
+  }
+
+  void updateDriverAccelBaseline(double accel) {
+    if (accel < 0) return;
+    _welfordAccelCount++;
+    final double delta = accel - _driverAccelMean;
+    _driverAccelMean += delta / _welfordAccelCount;
+    final double delta2 = accel - _driverAccelMean;
+    _driverAccelM2 += delta * delta2;
+  }
+
+  // ── EVENT EVIDENCE BUFFER (-5s to +5s Window) ────────────────────────
+  static const int _maxEvidenceBufferCapacity = 100; // ~10 seconds at 10Hz
+  final List<Map<String, dynamic>> _evidenceRingBuffer = [];
+
+  void pushEvidenceFrame(double ax, double ay, double az, double gx, double gy, double gz) {
+    if (_evidenceRingBuffer.length >= _maxEvidenceBufferCapacity) {
+      _evidenceRingBuffer.removeAt(0);
+    }
+    _evidenceRingBuffer.add({
+      't': DateTime.now().millisecondsSinceEpoch,
+      'ax': double.parse(ax.toStringAsFixed(2)),
+      'ay': double.parse(ay.toStringAsFixed(2)),
+      'az': double.parse(az.toStringAsFixed(2)),
+      'gx': double.parse(gx.toStringAsFixed(2)),
+      'gy': double.parse(gy.toStringAsFixed(2)),
+      'gz': double.parse(gz.toStringAsFixed(2)),
+      'spd': double.parse(_rawSpeed.toStringAsFixed(1)),
+    });
+  }
+
+  List<Map<String, dynamic>> captureEventEvidenceSnapshot() {
+    return List<Map<String, dynamic>>.from(_evidenceRingBuffer);
+  }
+
+  // ── MULTI-SIGNAL CONFIDENCE SCORING (0.0 - 1.0) ──────────────────────
+  double calculateEventConfidence({
+    required double sensorDecel,
+    required double speedKph,
+    required bool isEsp32Fused,
+    required double durationSec,
+  }) {
+    double confidence = 0.50; // Base heuristic
+    if (isEsp32Fused) confidence += 0.25; // Rigid chassis sensor confirmation
+    if (speedKph >= 25.0) confidence += 0.15; // Realistic driving velocity
+    if (durationSec >= 0.35) confidence += 0.10; // Sustained braking duration
+    return confidence > 1.0 ? 1.0 : confidence;
+  }
+
+  // ── DATA COLLECTION MODE FOR ML ──────────────────────────────────────
+  bool _dataCollectionMode = false;
+  bool get dataCollectionMode => _dataCollectionMode;
+  final List<String> _recordedCsvLines = [];
+  int get collectedSampleCount => _recordedCsvLines.length;
+
+  void toggleDataCollectionMode(bool enable) {
+    _dataCollectionMode = enable;
+    if (enable && _recordedCsvLines.isEmpty) {
+      _recordedCsvLines.add("timestamp_ms,ax,ay,az,gx,gy,gz,speed_kmh,lat,lng,label");
+    }
+    notifyListeners();
+  }
+
+  void logDataCollectionSample(String label) {
+    if (!_dataCollectionMode) return;
+    final line = "${DateTime.now().millisecondsSinceEpoch},"
+        "${_gForceX * 9.80665},${_gForceY * 9.80665},${_gForceZ * 9.80665},"
+        "$_gyroX,$_gyroY,$_gyroZ,$_rawSpeed,"
+        "${_currentLat ?? 0.0},${_currentLng ?? 0.0},$label";
+    _recordedCsvLines.add(line);
+  }
+
+  String exportCollectedCsv() {
+    return _recordedCsvLines.join("\n");
+  }
+
+  void clearCollectedData() {
+    _recordedCsvLines.clear();
+    notifyListeners();
+  }
+
   SensorProvider() {
     // Start sensor streams for visual radar meters
     startSensorMonitoring();
@@ -351,6 +459,11 @@ class SensorProvider extends ChangeNotifier {
 
       final phoneDynG = sqrt(_phoneGForceX * _phoneGForceX + _phoneGForceY * _phoneGForceY + _phoneGForceZ * _phoneGForceZ);
       _vibrationRate = phoneDynG < 0.25 ? 0.0 : phoneDynG;
+    }
+
+    pushEvidenceFrame(_gForceX, _gForceY, _gForceZ, _gyroX, _gyroY, _gyroZ);
+    if (_dataCollectionMode) {
+      logDataCollectionSample("normal");
     }
 
     _throttledNotify();
@@ -777,6 +890,16 @@ class SensorProvider extends ChangeNotifier {
           "Vertical shock (${zForce.toStringAsFixed(1)} G) registered. Pothole location pinned on live map.",
         );
         HapticService.mediumImpact();
+
+        if (_currentLat != null && _currentLng != null) {
+          ApiService.reportRoadAnomaly(
+            latitude: _currentLat!,
+            longitude: _currentLng!,
+            zShockG: zForce,
+            roadName: "Active Transit Corridor",
+            anomalyType: "POTENTIAL_POTHOLE",
+          );
+        }
       }
       return;
     }
@@ -794,18 +917,30 @@ class SensorProvider extends ChangeNotifier {
 
     if (now.difference(_lastAlertTime).inMilliseconds < 15000) return;
 
-    if (ay < thresholdBraking) {
+    final double effectiveBrakingThreshold = min(thresholdBraking, dynamicBrakingThreshold);
+
+    if (ay < effectiveBrakingThreshold) {
+      updateDriverBrakeBaseline(ay);
+      final double confidence = calculateEventConfidence(
+        sensorDecel: ay.abs(),
+        speedKph: _rawSpeed,
+        isEsp32Fused: _isEsp32Connected,
+        durationSec: 0.5,
+      );
       triggerEvent(
         "Harsh Braking",
         ay.abs() / 9.80665,
-        "Emergency deceleration detected. Increase following distance.",
+        "Emergency deceleration detected (${(confidence * 100).toInt()}% conf). Increase following distance.",
       );
+      if (_dataCollectionMode) logDataCollectionSample("harsh_braking");
     } else if (ay > thresholdAcceleration) {
+      updateDriverAccelBaseline(ay);
       triggerEvent(
         "Rapid Acceleration",
         ay / 9.80665,
         "Heavy launch throttle detected. Apply smooth acceleration.",
       );
+      if (_dataCollectionMode) logDataCollectionSample("rapid_acceleration");
     } else if (ax.abs() > thresholdCornering) {
       // Cooldown for sharp turns to avoid alert spam on winding roads
       if (now.difference(_lastTurnAlertTime).inSeconds >= 25) {
@@ -815,6 +950,7 @@ class SensorProvider extends ChangeNotifier {
           ax.abs() / 9.80665,
           "High lateral G-force in corner. Reduce speed prior to turn.",
         );
+        if (_dataCollectionMode) logDataCollectionSample("sharp_turn");
       }
     }
   }
@@ -899,6 +1035,18 @@ class SensorProvider extends ChangeNotifier {
         'longitude': _currentLng ?? 0.0,
         'timestamp': now.toIso8601String(),
       });
+    } catch (_) {}
+
+    // 3. Dispatch Synchronized High-Frequency Evidence Window to Backend
+    try {
+      final evidenceSnapshot = captureEventEvidenceSnapshot();
+      if (evidenceSnapshot.isNotEmpty) {
+        ApiService.uploadEventEvidence(
+          eventId: alert.id,
+          sensorSeries: evidenceSnapshot,
+          sampleRateHz: 20,
+        );
+      }
     } catch (_) {}
 
     notifyListeners();

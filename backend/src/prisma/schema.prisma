@@ -359,3 +359,48 @@ model AuditLog {
 
   @@map("audit_logs")
 }
+
+model RoadAnomaly {
+  id             String   @id @default(uuid()) @db.Uuid
+  latitude       Float
+  longitude      Float
+  anomalyType    String   @default("POTENTIAL_POTHOLE") @map("anomaly_type")
+  zShockG        Float    @map("z_shock_g")
+  detectionCount Int      @default(1) @map("detection_count")
+  roadName       String?  @map("road_name")
+  firstDetected  DateTime @default(now()) @map("first_detected")
+  lastDetected   DateTime @default(now()) @map("last_detected")
+
+  @@index([latitude, longitude])
+  @@map("road_anomalies")
+}
+
+model RiskHotspot {
+  id              String   @id @default(uuid()) @db.Uuid
+  latitude        Float
+  longitude       Float
+  radiusMeters    Float    @default(25.0) @map("radius_meters")
+  hazardType      String   @default("HARSH_BRAKING_ZONE") @map("hazard_type")
+  incidentCount   Int      @default(1) @map("incident_count")
+  distinctDrivers Int      @default(1) @map("distinct_drivers")
+  penaltyDiscount Float    @default(0.75) @map("penalty_discount")
+  locationName    String?  @map("location_name")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([latitude, longitude])
+  @@map("risk_hotspots")
+}
+
+model EventEvidence {
+  id           String   @id @default(uuid()) @db.Uuid
+  eventId      String?  @map("event_id")
+  windowStart  DateTime @map("window_start")
+  windowEnd    DateTime @map("window_end")
+  sampleRateHz Int      @default(20) @map("sample_rate_hz")
+  sensorSeries Json     @map("sensor_series")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("event_evidence")
+}
+

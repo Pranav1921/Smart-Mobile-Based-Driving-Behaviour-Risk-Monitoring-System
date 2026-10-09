@@ -16,6 +16,7 @@ import '../widgets/floating_safety_alert_banner.dart';
 import '../widgets/roadside_breakdown_modal.dart';
 import '../widgets/guardian_share_modal.dart';
 import '../widgets/server_connection_modal.dart';
+import '../widgets/realistic_vehicle_map_marker.dart';
 
 class TripScreen extends StatefulWidget {
   final bool isEmbedded;
@@ -151,40 +152,16 @@ class _TripScreenState extends State<TripScreen> {
                 markers: [
                   Marker(
                     point: currentPos,
-                    width: 44,
-                    height: 44,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: const Color(0xFFFF5722).withOpacity(0.25),
-                          ),
-                        ),
-                        Container(
-                          width: 22,
-                          height: 22,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFF5722),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2.5),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.25),
-                                blurRadius: 6,
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.navigation_rounded,
-                            color: Colors.white,
-                            size: 13,
-                          ),
-                        ),
-                      ],
+                    width: 80,
+                    height: 90,
+                    child: RealisticVehicleMapMarker(
+                      vehicleType: auth.profile.vehicleType,
+                      vehicleName: auth.profile.vehicleName,
+                      heading: trip.currentHeading,
+                      driverName: auth.profile.name.isNotEmpty ? auth.profile.name : 'Driver',
+                      isDeadZone: trip.isDeadZoneActive,
+                      isEmergency: trip.showSOSConfirmation,
+                      size: 58,
                     ),
                   ),
                   ...trip.safetyZones.where((z) => z.type == 'school').map((z) => Marker(
