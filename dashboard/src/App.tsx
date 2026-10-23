@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { AppShell } from './components/layout/AppShell'
 import LoginPage from './pages/LoginPage'
 import Dashboard from './pages/Dashboard'
@@ -44,6 +44,7 @@ export default function App() {
 
 function AppContent() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
   const {
     liveDrivers,
@@ -69,6 +70,7 @@ function AppContent() {
     dismissCrossDeliveryToast,
     initiateCrossDelivery,
   } = useSocket()
+  const [isAlertDismissed, setIsAlertDismissed] = useState<boolean>(false)
   const [dismissedIncidentId, setDismissedIncidentId] = useState<string | null>(null)
   const [selectedProtocolDriver, setSelectedProtocolDriver] = useState<Driver | null>(null)
   const [decisionToast, setDecisionToast] = useState<{ type: 'approve' | 'reject'; name: string; detail: string } | null>(null)
@@ -85,6 +87,13 @@ function AppContent() {
     window.addEventListener('smartdrive_candidate_decision', handleDecision)
     return () => window.removeEventListener('smartdrive_candidate_decision', handleDecision)
   }, [])
+
+  // Re-enable alert display when a fresh incoming emergency event arrives
+  useEffect(() => {
+    if (crashAlertDriver || sosAlertDriver || breakdownAlert) {
+      setIsAlertDismissed(false)
+    }
+  }, [crashAlertDriver, sosAlertDriver, breakdownAlert])
 
   // Active incident data resolution
   const emergencyDriver = liveDrivers.find((d) => d.status === 'emergency')
@@ -107,7 +116,9 @@ function AppContent() {
   )
   const isBreakdown = Boolean(breakdownAlert && !isSos)
   const isCrash = Boolean(crashAlertDriver && !isSos && !isBreakdown)
-  const isAlertActive = Boolean(activeIncident)
+  
+  // Cleanly hide emergency HUD if dismissed or already on the dedicated investigation page
+  const isAlertActive = Boolean(activeIncident) && !isAlertDismissed && location.pathname !== '/investigation'
 
   const rawDriverName = String(
     sosAlertDriver?.driverName || 
@@ -164,7 +175,26 @@ function AppContent() {
     }
   }
 
+  // Navigate to main Dashcam Investigation page and clear all overlapping modals & alerts
+  const handleOpenMainDashcam = () => {
+    setSelectedProtocolDriver(null)
+    setIsAlertDismissed(true)
+    setCrashAlertDriver(null)
+    setSosAlertDriver(null)
+    setBreakdownAlert(null)
+    if (activeDriverId) {
+      emitLiveCamRequest(activeDriverId, true)
+      if (matchedDriver?.userId && matchedDriver.userId !== activeDriverId) {
+        emitLiveCamRequest(matchedDriver.userId, true)
+      }
+    }
+    const targetId = activeDriverId || matchedDriver?.id || 'live'
+    navigate(`/investigation?driverId=${encodeURIComponent(targetId)}`)
+  }
+
   const handleConfirmOperatorSafe = () => {
+    setIsAlertDismissed(true)
+    setSelectedProtocolDriver(null)
     if (activeDriverId) {
       emitIncidentResolved(activeDriverId)
     }
@@ -178,6 +208,7 @@ function AppContent() {
   }
 
   const handleDismissAlert = () => {
+    setIsAlertDismissed(true)
     if (isCameraActive && activeDriverId) {
       emitLiveCamRequest(activeDriverId, false)
       setIsCameraActive(false)
@@ -185,6 +216,9 @@ function AppContent() {
     setCrashAlertDriver(null)
     setSosAlertDriver(null)
     setBreakdownAlert(null)
+    if (activeDriverId) {
+      emitIncidentResolved(activeDriverId)
+    }
   }
 
   const handleSendWhatsAppSos = () => {
@@ -427,15 +461,12 @@ function AppContent() {
               <span className="truncate">Call Driver</span>
             </a>
             <button
-              onClick={handleToggleDriverCamera}
-              className={`py-2 px-3 rounded-xl text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-2 transition border cursor-pointer active:scale-95 ${
-                isCameraActive
-                  ? 'bg-red-600 text-white border-red-400 animate-pulse'
-                  : 'bg-slate-800 hover:bg-slate-700 text-cyan-300 border-cyan-500/30'
-              }`}
+              onClick={handleOpenMainDashcam}
+              className="py-2 px-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-[11px] uppercase tracking-wider flex items-center justify-center gap-1.5 transition cursor-pointer active:scale-95 shadow-lg shadow-cyan-950/50"
+              title="Navigate directly to Full Dashcam Investigation Page"
             >
-              <Video size={12} />
-              <span>{isCameraActive ? 'Close Cam' : 'Live Dashcam'}</span>
+              <Video size={13} className="animate-pulse" />
+              <span>Live Dashcam ↗</span>
             </button>
           </div>
 

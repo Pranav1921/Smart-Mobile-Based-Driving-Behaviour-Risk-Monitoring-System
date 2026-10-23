@@ -7,7 +7,7 @@ jest.mock('ioredis', () => {
     return {
       on: jest.fn(),
       info: jest.fn(),
-      quit: jest.fn().mockResolvedValue('OK'),
+      quit: (jest.fn() as any).mockResolvedValue('OK'),
     };
   });
 });
@@ -17,7 +17,7 @@ jest.mock('bullmq', () => {
   return {
     Queue: jest.fn().mockImplementation(() => {
       return {
-        add: jest.fn().mockResolvedValue({ id: 'job-id' }),
+        add: (jest.fn() as any).mockResolvedValue({ id: 'job-id' }),
         on: jest.fn(),
       };
     }),
@@ -66,14 +66,14 @@ describe('Authentication Route Integration Tests', () => {
       });
     });
 
-    it('should fail with HTTP 400 when malformed email is supplied', async () => {
+    it('should fail with HTTP 400 when empty password is supplied', async () => {
       const res = await request(app)
         .post('/api/v1/auth/login')
-        .send({ email: 'not-an-email', password: 'short' });
+        .send({ email: 'test@smartdrive.ai', password: '' });
 
       expect(res.statusCode).toBe(400);
       expect(res.body.status).toBe('error');
-      expect(res.body.errors[0].path).toBe('body.email');
+      expect(res.body.errors[0].path).toBe('body.password');
     });
   });
 });

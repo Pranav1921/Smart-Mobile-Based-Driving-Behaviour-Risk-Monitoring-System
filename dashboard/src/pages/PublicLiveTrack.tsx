@@ -9,29 +9,89 @@ import {
 } from 'lucide-react'
 import 'leaflet/dist/leaflet.css'
 
-// Custom marker icon for public tracker
-const vehicleMarkerIcon = new L.DivIcon({
-  className: 'custom-vehicle-marker',
-  html: `
-    <div style="
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #10B981, #059669);
-      border: 3px solid white;
-      box-shadow: 0 0 15px rgba(16, 185, 129, 0.6);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-size: 20px;
-    ">
-      🚗
-    </div>
-  `,
-  iconSize: [44, 44],
-  iconAnchor: [22, 22],
-})
+// Custom 3D realistic vehicle marker for public tracker
+function getPublicVehicleMarkerIcon(driver: any) {
+  const text = `${driver?.vehicleType ?? ''} ${driver?.vehicleName ?? ''} ${driver?.vehiclePlate ?? ''}`.toLowerCase()
+  let path = '/markers/vehicle_car.png'
+  let width = 38
+  let height = 76
+
+  if (text.includes('scoot') || text.includes('activa') || text.includes('dio') || text.includes('ola') || text.includes('ather')) {
+    path = '/markers/vehicle_scooter.png'
+    width = 30
+    height = 68
+  } else if (text.includes('auto') || text.includes('rickshaw') || text.includes('3-wheel') || text.includes('tuk')) {
+    path = '/markers/vehicle_auto.png'
+    width = 38
+    height = 66
+  } else if (text.includes('bike') || text.includes('motorcycle') || text.includes('pulsar') || text.includes('bullet') || text.includes('2-wheel')) {
+    path = '/markers/vehicle_bike.png'
+    width = 32
+    height = 68
+  } else if (text.includes('truck') || text.includes('van') || text.includes('pickup') || text.includes('cargo') || text.includes('lcv')) {
+    path = '/markers/vehicle_truck.png'
+    width = 46
+    height = 92
+  }
+
+  const heading = typeof driver?.heading === 'number' ? driver.heading : 0
+  const isEmergency = driver?.status === 'emergency'
+  const isDeadZone = driver?.isDeadZone === true
+  const badgeColor = isEmergency ? '#ef4444' : isDeadZone ? '#06b6d4' : '#10b981'
+  const boxW = Math.max(width + 36, 96)
+  const boxH = height + 48
+
+  return new L.DivIcon({
+    className: 'custom-fleet-vehicle-marker',
+    iconSize: [boxW, boxH],
+    iconAnchor: [boxW / 2, boxH / 2],
+    html: `
+      <div style="position:relative;width:${boxW}px;height:${boxH}px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;">
+        ${isEmergency ? `<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:${width + 24}px;height:${height + 24}px;border-radius:28px;background:#ef4444;opacity:0.35;animation:pulse 1s infinite;pointer-events:none;"></div>` : ''}
+
+        <!-- Tactical Badge Tag -->
+        <div style="
+          position:absolute;
+          top:0;
+          display:flex;
+          align-items:center;
+          gap:4px;
+          background:rgba(10, 15, 29, 0.96);
+          border:1.5px solid ${badgeColor};
+          box-shadow: 0 4px 14px rgba(0,0,0,0.85);
+          border-radius:6px;
+          padding:2px 7px;
+          z-index:20;
+          pointer-events:none;
+        ">
+          <span style="width:5px;height:5px;border-radius:50%;background:${badgeColor};box-shadow:0 0 6px ${badgeColor};"></span>
+          <span style="font-family:ui-monospace, SFMono-Regular, monospace; font-size:10px; font-weight:900; color:#ffffff;">
+            ${driver?.vehiclePlate || 'KA-19-PT-2026'}
+          </span>
+        </div>
+
+        <!-- 3D Realistic Vehicle Model Body with Rotation -->
+        <div style="
+          position:relative;
+          width:${width}px;
+          height:${height}px;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          transform:rotate(${heading}deg);
+          transition:transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+          filter: drop-shadow(0 12px 22px rgba(0,0,0,0.9)) drop-shadow(0 3px 6px rgba(0,0,0,0.95));
+        ">
+          <img 
+            src="${path}" 
+            alt="Vehicle 3D Model" 
+            style="width:100%;height:100%;object-fit:contain;pointer-events:none;display:block;" 
+          />
+        </div>
+      </div>
+    `,
+  })
+}
 
 function MapRecenter({ center }: { center: [number, number] }) {
   const map = useMap()
@@ -184,7 +244,7 @@ export default function PublicLiveTrack() {
             )}
 
             {/* Live Vehicle Marker */}
-            <Marker position={centerPos} icon={vehicleMarkerIcon}>
+            <Marker position={centerPos} icon={getPublicVehicleMarkerIcon(driver)}>
               <Popup className="custom-leaflet-popup">
                 <div className="p-1 text-slate-900">
                   <div className="font-bold text-xs">{driverName}</div>

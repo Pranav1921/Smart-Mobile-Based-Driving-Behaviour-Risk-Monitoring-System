@@ -94,8 +94,7 @@ router.post('/:id/assign', (req: Request, res: Response) => {
 
   const order = orders[orderIdx];
 
-  // Push job_assigned to the driver's personal socket room
-  socketManager.sendToUser(driverId, 'job_assigned', {
+  const jobPayload = {
     orderId: order.id,
     customerName: order.customerName,
     items: order.items,
@@ -104,13 +103,23 @@ router.post('/:id/assign', (req: Request, res: Response) => {
     deliveryTo: order.deliveryLocation?.address || 'Customer Address',
     deliveryLocation: order.deliveryLocation,
     assignedAt: order.assignedAt,
-  });
-
-  // Also broadcast status update to admin dashboard org room
-  socketManager.broadcastToOrg('demo-org', 'order_assigned', {
-    orderId: order.id,
     driverId,
     driverName: driverName || 'Driver',
+  };
+
+  // Push job_assigned to the driver's personal socket room
+  socketManager.sendToUser(driverId, 'job_assigned', jobPayload);
+
+  // Global broadcast so demo web driver (port 5174) and mobile app catch it instantly
+  socketManager.io?.emit('job_assigned', jobPayload);
+
+  // Broadcast status update to admin dashboard org and dashboards room
+  socketManager.broadcastToOrg('demo-org', 'order_assigned', {
+    ...jobPayload,
+    status: 'ASSIGNED',
+  });
+  socketManager.io?.to('dashboards').emit('order_assigned', {
+    ...jobPayload,
     status: 'ASSIGNED',
   });
 

@@ -95,6 +95,18 @@ export default function Drivers() {
   const [deleteSuccessToast, setDeleteSuccessToast] = useState<string | null>(null)
   const [isVerificationOpen, setIsVerificationOpen] = useState(false)
   const [apiDrivers, setApiDrivers] = useState<Driver[]>([])
+  const [assignedOrders, setAssignedOrders] = useState<any[]>([])
+
+  const loadAssignedOrders = async () => {
+    try {
+      const host = window.location.hostname === 'localhost' ? 'localhost:3000' : `${window.location.hostname}:3000`;
+      const res = await fetch(`http://${host}/api/v1/orders`);
+      if (res.ok) {
+        const json = await res.json();
+        setAssignedOrders(json.data || []);
+      }
+    } catch (_) {}
+  };
   
   // Pending Employee Requests state
   const [pendingDrivers, setPendingDrivers] = useState<any[]>([])
@@ -141,9 +153,11 @@ export default function Drivers() {
   useEffect(() => {
     loadApiDrivers(selectedRegion)
     refreshPending(selectedRegion)
+    loadAssignedOrders()
     const interval = setInterval(() => {
       refreshPending(selectedRegion)
-    }, 8000)
+      loadAssignedOrders()
+    }, 4000)
     return () => clearInterval(interval)
   }, [selectedRegion])
 
@@ -162,6 +176,38 @@ export default function Drivers() {
       if (d && isDriverInRegion(d, selectedRegion)) {
         const existing = initialMap.get(d.id)
         initialMap.set(d.id, existing ? { ...existing, ...d } : d)
+      }
+    });
+
+    // 3. Merge with assigned orders from backend
+    (assignedOrders || []).forEach((o: any) => {
+      if (o.status !== 'ASSIGNED') return;
+      const oId = (o.assignedDriverId || '').toLowerCase();
+      const oName = (o.assignedDriverName || '').toLowerCase().trim();
+
+      for (const [key, d] of initialMap.entries()) {
+        const dId = (d.id || '').toLowerCase();
+        const dUserId = ((d as any).userId || '').toLowerCase();
+        const dEmpId = ((d as any).employeeId || '').toLowerCase();
+        const dName = (d.name || '').toLowerCase().trim();
+
+        if (
+          (dId && oId === dId) ||
+          (dUserId && oId === dUserId) ||
+          (dEmpId && oId === dEmpId) ||
+          (dName && oName && (dName.includes(oName) || oName.includes(dName)))
+        ) {
+          initialMap.set(key, {
+            ...d,
+            status: d.status === 'emergency' ? 'emergency' : 'delivery',
+            deliveryTo: o.deliveryLocation?.address,
+            deliveryFrom: o.deliveryFrom,
+            orderItems: Array.isArray(o.items) ? o.items.join(', ') : o.items,
+            destLat: o.deliveryLocation?.latitude,
+            destLng: o.deliveryLocation?.longitude,
+            activeOrder: o,
+          });
+        }
       }
     });
 
@@ -216,7 +262,7 @@ export default function Drivers() {
         const valB = Number(b?.[sortKey] ?? 0);
         return valB - valA;
       });
-  }, [liveDrivers, selectedRegion, q, sortKey]);
+  }, [liveDrivers, selectedRegion, q, sortKey, assignedOrders]);
 
   const pendingRows = useMemo(() => {
     // Combine fetched API applications with real-time socket applications
@@ -656,9 +702,21 @@ export default function Drivers() {
                               </span>
                             )}
                             {(Boolean(d?.deliveryTo || d?.orderItems || d?.destLat != null || d?.status === 'delivery')) && (
-                              <span className="font-pixel text-[8px] px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 flex items-center gap-1">
-                                <Truck size={10} /> ON MISSION
-                              </span>
+                              <div className="flex flex-col gap-0.5 mt-1">
+                                <span className="font-pixel text-[8px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center gap-1 font-bold animate-pulse">
+                                  <Truck size={10} className="text-emerald-400" /> ON MISSION
+                                </span>
+                                {d?.deliveryTo && (
+                                  <span className="font-mono text-[8px] text-emerald-300 truncate max-w-[150px]" title={`Destination: ${d.deliveryTo}`}>
+                                    📍 {d.deliveryTo}
+                                  </span>
+                                )}
+                                {d?.orderItems && (
+                                  <span className="font-mono text-[8px] text-slate-400 truncate max-w-[150px]" title={`Items: ${d.orderItems}`}>
+                                    📦 {d.orderItems}
+                                  </span>
+                                )}
+                              </div>
                             )}
                           </div>
                         </td>

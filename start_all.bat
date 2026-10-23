@@ -38,7 +38,7 @@ cd dashboard
 if not exist node_modules (
     call npm install
 )
-start "SmartDrive-Admin-Dashboard" cmd /k "npm run dev"
+start "SmartDrive-Admin-Dashboard" cmd /k "set NODE_OPTIONS=--max-old-space-size=2048 && npm run dev"
 cd ..
 timeout /t 2 /nobreak > nul
 

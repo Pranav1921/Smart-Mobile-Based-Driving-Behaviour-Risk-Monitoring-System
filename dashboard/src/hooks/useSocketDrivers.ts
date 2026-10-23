@@ -742,6 +742,43 @@ export function useSocketDrivers(initialMockDrivers: Driver[]) {
       setSameDirectionSummary(data);
     });
 
+    const handleOrderAssigned = (data: any) => {
+      console.log('[Dashboard] 📦 ORDER/JOB ASSIGNED EVENT RECEIVED:', data);
+      setLiveDrivers(prev =>
+        prev.map(d => {
+          const targetId = (data.driverId || '').toLowerCase();
+          const targetName = (data.driverName || '').toLowerCase().trim();
+          const dId = (d.id || '').toLowerCase();
+          const dUserId = ((d as any).userId || '').toLowerCase();
+          const dEmpId = ((d as any).employeeId || '').toLowerCase();
+          const dName = (d.name || '').toLowerCase().trim();
+
+          const matches =
+            (dId && dId === targetId) ||
+            (dUserId && dUserId === targetId) ||
+            (dEmpId && dEmpId === targetId) ||
+            (dName && targetName && (dName.includes(targetName) || targetName.includes(dName)));
+
+          if (matches) {
+            return {
+              ...d,
+              status: 'delivery',
+              deliveryTo: data.deliveryTo || data.dropAddress,
+              deliveryFrom: data.deliveryFrom || data.pickupAddress,
+              orderItems: Array.isArray(data.items) ? data.items.join(', ') : (data.items || 'Express Consignment'),
+              destLat: data.dropLat || data.deliveryLocation?.latitude,
+              destLng: data.dropLng || data.deliveryLocation?.longitude,
+              activeOrder: data,
+            };
+          }
+          return d;
+        })
+      );
+    };
+
+    socket.on('order_assigned', handleOrderAssigned);
+    socket.on('job_assigned', handleOrderAssigned);
+
     return () => {
       socket.off('connect');
       socket.off('disconnect');
@@ -769,6 +806,8 @@ export function useSocketDrivers(initialMockDrivers: Driver[]) {
       socket.off('cross_delivery_available');
       socket.off('cross_delivery_confirmed');
       socket.off('fleet_same_direction_summary');
+      socket.off('order_assigned', handleOrderAssigned);
+      socket.off('job_assigned', handleOrderAssigned);
       clearInterval(pendingPollInterval);
     };
   }, [crashAlertDriver, refreshPendingDrivers]);
@@ -791,7 +830,21 @@ export function useSocketDrivers(initialMockDrivers: Driver[]) {
 
   const emitIncidentResolved = (driverId: string) => {
     socket.emit('resolve_incident', { driverId });
-  }
+    setCrashAlertDriver(null);
+    setSosAlertDriver(null);
+    setBreakdownAlert(null);
+    setLiveDrivers(prev =>
+      prev.map(d => {
+        const matches =
+          !driverId ||
+          d.id === driverId ||
+          (d.driverId || (d as any).driverId) === driverId ||
+          d.userId === driverId ||
+          d.status === 'emergency';
+        return matches ? { ...d, status: 'safe', alertType: undefined, sosReason: undefined } : d;
+      })
+    );
+  };
 
   const emitDriverMessage = (driverId: string, message: string) => {
     socket.emit('driver_message', { driverId, message });
@@ -799,7 +852,37 @@ export function useSocketDrivers(initialMockDrivers: Driver[]) {
 
   const emitAssignJob = (driverId: string, data: any) => {
     socket.emit('assign_job', { driverId, ...data });
-  }
+    setLiveDrivers(prev =>
+      prev.map(d => {
+        const targetId = (driverId || '').toLowerCase();
+        const targetName = (data?.driverName || '').toLowerCase().trim();
+        const dId = (d.id || '').toLowerCase();
+        const dUserId = ((d as any).userId || '').toLowerCase();
+        const dEmpId = ((d as any).employeeId || '').toLowerCase();
+        const dName = (d.name || '').toLowerCase().trim();
+
+        const matches =
+          (dId && dId === targetId) ||
+          (dUserId && dUserId === targetId) ||
+          (dEmpId && dEmpId === targetId) ||
+          (dName && targetName && (dName.includes(targetName) || targetName.includes(dName)));
+
+        if (matches) {
+          return {
+            ...d,
+            status: 'delivery',
+            deliveryTo: data.deliveryTo || data.dropAddress,
+            deliveryFrom: data.deliveryFrom || data.pickupAddress,
+            orderItems: Array.isArray(data.items) ? data.items.join(', ') : (data.items || 'Express Consignment'),
+            destLat: data.dropLat || data.deliveryLocation?.latitude,
+            destLng: data.dropLng || data.deliveryLocation?.longitude,
+            activeOrder: data,
+          };
+        }
+        return d;
+      })
+    );
+  };
 
   const emitCreateGeofence = (zone: Omit<GeofenceZone, 'id' | 'createdAt'>) => {
     socket.emit('geofence_create', zone);

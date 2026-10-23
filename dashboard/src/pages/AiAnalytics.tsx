@@ -24,7 +24,7 @@ export default function AiAnalytics() {
         <Kpi icon={Brain} label="Fleet Risk Index" value="Low–Med" tone="#fbbf24" />
         <Kpi icon={TrendingUp} label="Behaviour Trend" value="+6.3%" tone="#34d399" />
         <Kpi icon={Target} label="Model Accuracy" value="94.1%" tone="#22d3ee" />
-        <Kpi icon={Trophy} label="Top Performer" value={ranked[0].name.split(' ')[0]} tone="#a78bfa" />
+        <Kpi icon={Trophy} label="Top Performer" value={ranked[0]?.name ? ranked[0].name.split(' ')[0] : 'None'} tone="#a78bfa" />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">

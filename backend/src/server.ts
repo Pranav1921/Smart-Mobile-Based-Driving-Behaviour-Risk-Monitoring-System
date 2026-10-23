@@ -51,6 +51,7 @@ server.listen(Number(PORT), '0.0.0.0', async () => {
   try {
     await prisma.$connect();
     logger.info('PostgreSQL database verification completed successfully.');
+    await socketManager.syncFleetDriversFromDatabase();
   } catch (err) {
     logger.warn(
       'PostgreSQL database verification failed. Operating in resilient / memory mode for Socket.IO and telemetry.',

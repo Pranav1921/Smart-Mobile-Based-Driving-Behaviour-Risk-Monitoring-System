@@ -29,6 +29,7 @@ class SocketService {
 
   static Function(bool isDeadZone)? onDeadZoneStatusChangedCallback;
   static Map<String, dynamic>? _lastPendingGpsUpdate;
+  static Map<String, dynamic>? _lastShiftStatusPayload;
   static final List<Map<String, dynamic>> _offlineBuffer = [];
   static final List<Map<String, dynamic>> _pendingBreakdownAlerts = [];
   static final List<Map<String, dynamic>> _pendingSosAlerts = [];
@@ -79,7 +80,7 @@ class SocketService {
     _hostSubscription ??= DiscoveryService.onHostChanged.listen((newHost) async {
       String? token = await ApiService.getToken();
       token ??= "demo-driver-token-${DateTime.now().millisecondsSinceEpoch}";
-      if (_connectedHost != newHost) {
+      if (_connectedHost != newHost || !isConnected) {
         print('[SocketService] 🔄 Host changed dynamically to $newHost. Re-establishing link...');
         _connectToHost(newHost, token);
       }
@@ -119,6 +120,7 @@ class SocketService {
           .setTransports(['websocket', 'polling'])
           .enableAutoConnect()
           .enableReconnection()
+          .enableForceNew()
           .setReconnectionAttempts(999)
           .setReconnectionDelay(1000)
           .setTimeout(4000)
@@ -126,12 +128,20 @@ class SocketService {
           .build(),
     );
 
+    _socket = socket;
+
     socket.onConnect((_) {
       _consecutiveErrors = 0;
       _connectedHost = host;
       _socket = socket;
       connectionStatus = "Connected ($host)";
       print('[SocketService] ✅ LINK ESTABLISHED at $host (Socket ID: ${socket.id})');
+
+      // Re-emit shift status immediately upon connection if active
+      if (_lastShiftStatusPayload != null) {
+        _socket?.emit('shift_status', _lastShiftStatusPayload);
+        print('[SocketService] 🚀 Emitted pending shift status: ${_lastShiftStatusPayload!['status']}');
+      }
 
       if (_lastPendingGpsUpdate != null) {
         _socket?.emit('gps_update', _lastPendingGpsUpdate);
@@ -201,9 +211,11 @@ class SocketService {
     socket.onDisconnect((_) {
       print('[SocketService] 🔌 Link Severed from host');
       connectionStatus = "Disconnected";
+      _connectedHost = null;
     });
 
     _attachListeners(socket);
+    socket.connect();
   }
 
   static void _attemptAutoRecovery(String token) async {
@@ -214,7 +226,7 @@ class SocketService {
 
     try {
       final newHost = await DiscoveryService.autoDiscoverHost(forceRefresh: true);
-      if (newHost != null && newHost != _connectedHost) {
+      if (newHost != null && (newHost != _connectedHost || !isConnected)) {
         print('[SocketService] ✨ Found updated backend server at $newHost! Connecting...');
         _connectToHost(newHost, token);
       }
@@ -447,8 +459,7 @@ class SocketService {
     String? regionId,
     String? region,
   }) {
-    if (_socket == null || !_socket!.connected) return;
-    _socket?.emit('shift_status', {
+    final payload = {
       'driverId': driverId,
       'driverName': driverName,
       'status': status,
@@ -457,7 +468,12 @@ class SocketService {
       'regionId': regionId,
       'region': region ?? regionId,
       'timestamp': DateTime.now().toIso8601String(),
-    });
+    };
+    _lastShiftStatusPayload = payload;
+
+    if (_socket != null && _socket!.connected) {
+      _socket?.emit('shift_status', payload);
+    }
   }
 
   static void emitCrashAlert({

@@ -24,22 +24,60 @@ class RealisticVehicleMapMarker extends StatelessWidget {
 
   static String getAssetPath(String? type, String? name) {
     final text = "${type ?? ''} ${name ?? ''}".toLowerCase();
+    // 1. Scooter (Activa, Jupiter, Dio, Electric Scooters)
+    if (text.contains('scoot') ||
+        text.contains('dio') ||
+        text.contains('activa') ||
+        text.contains('jupiter') ||
+        text.contains('moped') ||
+        text.contains('ather') ||
+        text.contains('ola') ||
+        text.contains('chetak') ||
+        text.contains('pep') ||
+        text.contains('burgman') ||
+        text.contains('ntorq')) {
+      return 'assets/images/vehicle_scooter.png';
+    }
+    // 2. Auto Rickshaw (Three-wheeler / Tuk-Tuk)
+    if (text.contains('auto') ||
+        text.contains('rickshaw') ||
+        text.contains('3-wheel') ||
+        text.contains('3_wheeler') ||
+        text.contains('three-wheel') ||
+        text.contains('tuk') ||
+        text.contains('ape')) {
+      return 'assets/images/vehicle_auto.png';
+    }
+    // 3. Motorcycle / Bike
     if (text.contains('bike') ||
         text.contains('motorcycle') ||
-        text.contains('scoot') ||
         text.contains('pulsar') ||
-        text.contains('activa') ||
+        text.contains('splendor') ||
+        text.contains('bullet') ||
+        text.contains('royal enfield') ||
+        text.contains('apache') ||
+        text.contains('ktm') ||
+        text.contains('fz') ||
+        text.contains('shine') ||
+        text.contains('platina') ||
         text.contains('2-wheel')) {
       return 'assets/images/vehicle_bike.png';
     }
+    // 4. Commercial Truck / Van / Cargo
     if (text.contains('truck') ||
         text.contains('ace') ||
         text.contains('lcv') ||
         text.contains('van') ||
+        text.contains('delivery_van') ||
         text.contains('cargo') ||
-        text.contains('pickup')) {
+        text.contains('pickup') ||
+        text.contains('bolero') ||
+        text.contains('lorry') ||
+        text.contains('eicher') ||
+        text.contains('dost')) {
       return 'assets/images/vehicle_truck.png';
     }
+    // 5. Default Car / Cab / Taxi
     return 'assets/images/vehicle_car.png';
   }
 

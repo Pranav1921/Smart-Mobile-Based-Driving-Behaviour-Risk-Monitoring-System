@@ -129,6 +129,19 @@ export default function Orders() {
       })
 
       if (res.ok) {
+        emitAssignJob(driverId || '', {
+          orderId: order.id,
+          driverId,
+          customerName: order.customerName,
+          items: order.items,
+          amount: order.amount,
+          deliveryFrom: order.deliveryFrom || 'Main Logistics Hub',
+          deliveryTo: order.deliveryLocation?.address,
+          dropAddress: order.deliveryLocation?.address,
+          dropLat: order.deliveryLocation?.latitude,
+          dropLng: order.deliveryLocation?.longitude,
+          driverName,
+        })
         setAssigningOrderId(null)
         if (inspectingOrder?.id === order.id) {
           setInspectingOrder(prev => prev ? { ...prev, status: 'ASSIGNED', driverId, driverName } : null)

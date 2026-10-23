@@ -3,6 +3,7 @@ import http from 'http';
 import jwt from 'jsonwebtoken';
 import { logger } from '../config/logger';
 import { TokenPayload } from '../services/auth.service';
+import { prisma } from '../database/client';
 
 const ACCESS_SECRET =
   process.env.JWT_ACCESS_SECRET ||
@@ -21,7 +22,7 @@ interface LiveDriver {
   longitude: number;
   speed: number;
   heading: number;
-  status: 'safe' | 'warning' | 'emergency' | 'idle' | 'offline';
+  status: 'safe' | 'warning' | 'emergency' | 'idle' | 'offline' | 'delivery';
   lastSeen: string;
   isOnline?: boolean;
   safetyScore?: number;
@@ -166,7 +167,7 @@ export function computeHaversineKm(lat1: number, lon1: number, lat2: number, lon
 }
 
 export class SocketManager {
-  private io: Server | null = null;
+  public io: Server | null = null;
   private userSockets: Map<string, string[]> = new Map();
 
   initialize(server: http.Server) {
@@ -404,7 +405,7 @@ export class SocketManager {
       }
     });
 
-    this.io.on('connection', (socket: Socket) => {
+    this.io.on('connection', async (socket: Socket) => {
       const user = socket.data.user as TokenPayload;
       const { userId, organizationId, role } = user;
 
@@ -431,7 +432,11 @@ export class SocketManager {
       // ── Dashboard: on connect, send current live driver & potholes snapshot ─────────
       if (isAdmin || socket.handshake.auth?.role === 'dashboard') {
         // Send cleaned, deduplicated live drivers snapshot
-        const snapshot = this.getLiveDrivers();
+        let snapshot = this.getLiveDrivers();
+        if (snapshot.length === 0) {
+          await this.syncFleetDriversFromDatabase();
+          snapshot = this.getLiveDrivers();
+        }
         socket.emit('live_snapshot', snapshot);
         socket.emit('potholes_snapshot', livePotholes);
         socket.emit('geofences_sync', liveGeofences);
@@ -1218,6 +1223,27 @@ export class SocketManager {
       socket.on('assign_job', (data: { driverId: string; [key: string]: any }) => {
         logger.info(`Admin assigning job to driver ${data.driverId}`);
         this.io?.to(`user:${data.driverId}`).emit('job_assigned', data);
+        this.io?.emit('job_assigned', data);
+        this.io?.to('dashboards').emit('order_assigned', data);
+
+        // Update in-memory live driver status so admin HUD & driver cards immediately show ON DELIVERY
+        for (const [key, d] of liveDrivers.entries()) {
+          const matches =
+            key === data.driverId ||
+            d.driverId === data.driverId ||
+            (d as any).userId === data.driverId ||
+            (d.name && data.driverName && d.name.toLowerCase().includes(String(data.driverName).toLowerCase()));
+          if (matches) {
+            d.status = 'delivery';
+            (d as any).deliveryTo = data.deliveryTo || data.dropAddress;
+            (d as any).deliveryFrom = data.deliveryFrom || data.pickupAddress;
+            (d as any).orderItems = Array.isArray(data.items) ? data.items.join(', ') : (data.items || 'Express Consignment');
+            (d as any).activeOrder = data;
+            liveDrivers.set(key, d);
+            this.io?.to('dashboards').emit('driver_location_update', d);
+            break;
+          }
+        }
       });
 
       // ── DRIVER: Update Profile Avatar (from Mobile Gallery/Camera) ─────
@@ -2198,7 +2224,7 @@ export class SocketManager {
          if (d.status !== 'emergency') {
            d.status = 'offline';
          }
-       } else if (elapsedMs > 900000) {
+       } else if (elapsedMs > 900000 && !(d as any).isSyncedFleet) {
          // Purge after 15 minutes of complete inactivity
          liveDrivers.delete(id);
        }
@@ -2233,6 +2259,108 @@ export class SocketManager {
     logger.info(`[Socket Broadcast -> Dashboards] Event: ${eventName}`);
     this.io.to('dashboards').emit(eventName, data);
     this.io.emit(eventName, data);
+  }
+
+  async syncFleetDriversFromDatabase() {
+    try {
+      const dbDrivers = await prisma.driver.findMany({
+        include: {
+          user: true,
+          vehicleAssignments: {
+            include: { vehicle: true },
+            where: { unassignedAt: null },
+          },
+        },
+      });
+
+      liveDrivers.clear();
+
+      if (!dbDrivers || dbDrivers.length === 0) {
+        if (this.io) {
+          this.io.to('dashboards').emit('live_snapshot', []);
+        }
+        logger.info('Fleet drivers synchronized: 0 active drivers.');
+        return;
+      }
+
+      dbDrivers.forEach((driver, idx) => {
+        const user = driver.user;
+        const zoneStr = (user.zone || 'puttur_taluk').toLowerCase();
+
+        let baseLat = 12.7749;
+        let baseLng = 75.2023;
+        let regionId = 'puttur_taluk';
+
+        if (zoneStr.includes('mangaluru') || zoneStr.includes('mangalore')) {
+          baseLat = 12.9141;
+          baseLng = 74.8560;
+          regionId = 'mangaluru_taluk';
+        } else if (zoneStr.includes('bengaluru') || zoneStr.includes('bangalore') || zoneStr.includes('indiranagar')) {
+          baseLat = 12.9716;
+          baseLng = 77.5946;
+          regionId = 'bengaluru_urban';
+        } else if (zoneStr.includes('udupi') || zoneStr.includes('manipal')) {
+          baseLat = 13.3409;
+          baseLng = 74.7421;
+          regionId = 'udupi_taluk';
+        }
+
+        const hasRealCoords = Boolean(driver.latitude && driver.latitude !== 0 && driver.longitude && driver.longitude !== 0);
+        const lat = (hasRealCoords && driver.latitude !== null) ? driver.latitude : baseLat;
+        const lng = (hasRealCoords && driver.longitude !== null) ? driver.longitude : baseLng;
+
+        const assignment = driver.vehicleAssignments?.[0]?.vehicle;
+        const vTypeRaw = assignment?.vehicleType ? String(assignment.vehicleType).toLowerCase() : '';
+        const emailLower = (user.email || '').toLowerCase();
+        
+        let vehicleType = 'car';
+        if (vTypeRaw.includes('scooter') || emailLower.includes('scooter') || emailLower.includes('dio') || emailLower.includes('activa')) {
+          vehicleType = 'scooter';
+        } else if (vTypeRaw.includes('motorcycle') || emailLower.includes('bike') || emailLower.includes('pulsar')) {
+          vehicleType = 'bike';
+        } else if (emailLower.includes('auto') || emailLower.includes('3_wheel')) {
+          vehicleType = 'auto';
+        } else if (vTypeRaw.includes('truck') || vTypeRaw.includes('van') || vTypeRaw.includes('pickup') || emailLower.includes('van') || emailLower.includes('truck')) {
+          vehicleType = 'truck';
+        }
+
+        const plate = assignment?.licensePlate || driver.licenseNumber || `KA-19-DRV-${100 + idx}`;
+        const name = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Fleet Driver';
+
+        liveDrivers.set(driver.id, {
+          id: driver.id,
+          driverId: driver.id,
+          userId: user.id,
+          name,
+          driverName: name,
+          organizationId: user.organizationId || 'demo-org',
+          latitude: lat,
+          longitude: lng,
+          speed: 0,
+          heading: 0,
+          status: 'offline',
+          lastSeen: driver.lastSeen ? driver.lastSeen.toISOString() : new Date().toISOString(),
+          isOnline: false,
+          safetyScore: driver.safetyScore || 100,
+          regionId,
+          region: user.zone || 'Puttur Taluk',
+          vehicleType,
+          vehiclePlate: plate,
+          vehicleId: plate,
+          phone: user.phoneNumber || '',
+          email: user.email,
+          isSyncedFleet: true,
+        });
+      });
+
+      logger.info(`✅ Synchronized ${liveDrivers.size} fleet drivers into live tracking engine.`);
+      if (this.io) {
+        const snapshot = this.getLiveDrivers();
+        this.io.to('dashboards').emit('live_snapshot', snapshot);
+      }
+    } catch (err) {
+      logger.warn('Failed to sync fleet drivers from database:', err);
+    }
   }
 
   removeDriver(driverId: string) {

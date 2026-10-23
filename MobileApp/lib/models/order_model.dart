@@ -148,7 +148,9 @@ class DeliveryOrder {
       pickupLng: (json['pickupLng'] as num?)?.toDouble() ?? 75.2023,
       dropLat: (location?['latitude'] as num?)?.toDouble() ?? 12.7950,
       dropLng: (location?['longitude'] as num?)?.toDouble() ?? 75.2250,
-      packageItems: json['orderItems'] ?? json['packageItems'] ?? json['items'] ?? 'Tactical Logistics Package',
+      packageItems: (json['items'] is List)
+          ? (json['items'] as List).join(', ')
+          : (json['orderItems']?.toString() ?? json['packageItems']?.toString() ?? json['items']?.toString() ?? 'Tactical Logistics Package'),
       driverName: json['driverName'] ?? 'Pranav Kumar (Agent #402)',
       driverPhone: json['driverPhone'] ?? '+91 98451 23098',
       driverAddress: json['driverAddress'] ?? (json['deliveryFrom'] ?? 'Sector 4 Depot Hub'),

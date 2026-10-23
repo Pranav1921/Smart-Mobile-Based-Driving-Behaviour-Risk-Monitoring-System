@@ -31,6 +31,12 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final trip = Provider.of<TripProvider>(context, listen: false);
+        trip.loadBackendOrders();
+      }
+    });
   }
 
   @override
@@ -43,8 +49,11 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
     setState(() => _isLoadingOrders = true);
     HapticService.lightImpact();
     SoundEffectService.playRelayLatch();
-    await Future.delayed(const Duration(milliseconds: 500));
-    trip.assignRandomOrder();
+    await trip.loadBackendOrders();
+    if (trip.availableOrders.isEmpty && trip.activeOrder == null) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      trip.assignRandomOrder();
+    }
     if (mounted) setState(() => _isLoadingOrders = false);
   }
 

@@ -21,6 +21,7 @@ import '../services/overpass_service.dart';
 import '../services/road_rules_service.dart';
 import '../services/haptic_service.dart';
 import '../services/floating_overlay_service.dart';
+import '../services/api_service.dart';
 import 'sensor_provider.dart';
 
 class SafetyZone {
@@ -427,6 +428,7 @@ class TripProvider extends ChangeNotifier {
   );
 
   TripProvider() {
+    loadBackendOrders();
     SocketService.onJobAssignedCallback = (data) {
       handleJobAssigned(data);
     };
@@ -773,6 +775,30 @@ class TripProvider extends ChangeNotifier {
     _availableOrders.removeWhere((o) => o.id == order.id);
     _availableOrders.insert(0, order);
     notifyListeners();
+  }
+
+  Future<void> loadBackendOrders() async {
+    try {
+      final orders = await ApiService.fetchOrders();
+      if (orders.isNotEmpty) {
+        for (final order in orders) {
+          if (order.status.toLowerCase() == 'assigned') {
+            if (_activeOrder == null) {
+              _activeOrder = order;
+            } else {
+              _availableOrders.removeWhere((o) => o.id == order.id);
+              _availableOrders.insert(0, order);
+            }
+          } else {
+            _availableOrders.removeWhere((o) => o.id == order.id);
+            _availableOrders.insert(0, order);
+          }
+        }
+        notifyListeners();
+      }
+    } catch (e) {
+      print('[TripProvider] Error loading backend orders: $e');
+    }
   }
 
   Future<DeliveryOrder> generateMockOrder() async {

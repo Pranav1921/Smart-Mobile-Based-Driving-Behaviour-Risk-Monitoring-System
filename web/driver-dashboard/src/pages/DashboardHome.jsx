@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import L from "leaflet";
 import { io } from "socket.io-client";
 import {
   ChevronRight, Package, CheckCircle, XCircle, Truck,
@@ -7,6 +8,50 @@ import {
   MapPin, TrendingUp, Activity
 } from "lucide-react";
 import apiClient from "../api/apiClient";
+
+function getDriverVehicleIcon(driver) {
+  const text = `${driver?.vehicleType || driver?.driverType || ''} ${driver?.vehicleName || ''} ${driver?.licenseNumber || ''}`.toLowerCase();
+  let path = '/markers/vehicle_car.png';
+  let width = 34;
+  let height = 68;
+
+  if (text.includes('scoot') || text.includes('activa') || text.includes('dio') || text.includes('ola') || text.includes('ather')) {
+    path = '/markers/vehicle_scooter.png';
+    width = 28;
+    height = 60;
+  } else if (text.includes('auto') || text.includes('rickshaw') || text.includes('3-wheel') || text.includes('tuk')) {
+    path = '/markers/vehicle_auto.png';
+    width = 34;
+    height = 60;
+  } else if (text.includes('bike') || text.includes('motorcycle') || text.includes('pulsar') || text.includes('2-wheel')) {
+    path = '/markers/vehicle_bike.png';
+    width = 28;
+    height = 62;
+  } else if (text.includes('truck') || text.includes('van') || text.includes('pickup') || text.includes('cargo') || text.includes('delivery_van')) {
+    path = '/markers/vehicle_truck.png';
+    width = 40;
+    height = 80;
+  }
+
+  const name = driver?.user?.firstName || 'Driver';
+  const heading = driver?.heading || 0;
+
+  return L.divIcon({
+    className: 'custom-driver-vehicle-marker',
+    iconSize: [width + 30, height + 36],
+    iconAnchor: [(width + 30) / 2, (height + 36) / 2],
+    html: `
+      <div style="position:relative;width:${width + 30}px;height:${height + 36}px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;">
+        <div style="position:relative;width:${width}px;height:${height}px;transform:rotate(${heading}deg);filter:drop-shadow(0 8px 16px rgba(0,0,0,0.8));">
+          <img src="${path}" alt="Vehicle" style="width:100%;height:100%;object-fit:contain;display:block;" />
+        </div>
+        <div style="background:rgba(15,23,42,0.92);border:1px solid #10b981;border-radius:12px;padding:1px 6px;margin-top:2px;">
+          <span style="font-size:8px;font-weight:800;color:white;">${name}</span>
+        </div>
+      </div>
+    `,
+  });
+}
 
 function MapRecenter({ coords }) {
   const map = useMap();
@@ -103,6 +148,7 @@ export default function DashboardHome({ user, onLogout }) {
       setSocketConnected(true);
     });
     socket.on("job_assigned", (job) => setPendingJob(job));
+    socket.on("order_assigned", (job) => setPendingJob(job));
     socket.on("driver_location_update", (data) => {
       setDrivers((prev) => {
         const updated = [...prev];
@@ -158,9 +204,48 @@ export default function DashboardHome({ user, onLogout }) {
   // Polling
   useEffect(() => {
     fetchDashboardData();
-    const iv = setInterval(fetchDashboardData, 5000);
+    fetchAssignedOrders();
+    const iv = setInterval(() => {
+      fetchDashboardData();
+      fetchAssignedOrders();
+    }, 4000);
     return () => clearInterval(iv);
   }, []);
+
+  const fetchAssignedOrders = async () => {
+    try {
+      const host = window.location.hostname && window.location.hostname !== 'localhost' ? window.location.hostname : 'localhost';
+      const res = await fetch(`http://${host}:3000/api/v1/orders`);
+      if (res.ok) {
+        const json = await res.json();
+        const orders = json.data || [];
+        const assigned = orders.filter((o) => o.status === 'ASSIGNED');
+        if (assigned.length > 0) {
+          const latest = assigned[assigned.length - 1];
+          setActiveDelivery((prevActive) => {
+            if (prevActive) return prevActive;
+            setPendingJob((prevPending) => {
+              if (prevPending) return prevPending;
+              return {
+                orderId: latest.id,
+                customerName: latest.customerName,
+                items: latest.items,
+                amount: latest.amount,
+                deliveryFrom: latest.deliveryFrom || 'Main Logistics Hub',
+                deliveryTo: latest.deliveryLocation?.address || 'Customer Delivery Point',
+                deliveryLocation: latest.deliveryLocation,
+                driverName: latest.assignedDriverName,
+                assignedAt: latest.assignedAt,
+              };
+            });
+            return prevActive;
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Dashboard fetch orders error:", err);
+    }
+  };
 
   const fetchDashboardData = async () => {
     try {
@@ -342,6 +427,61 @@ export default function DashboardHome({ user, onLogout }) {
           </div>
         </div>
 
+        {/* Active Dispatch Mission Card */}
+        {(activeDelivery || pendingJob) && (
+          <div className="bg-gradient-to-r from-emerald-900 via-[#1B3B2B] to-emerald-950 text-white rounded-[24px] p-6 shadow-xl border border-emerald-700/50 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            <div className="flex items-start gap-4">
+              <div className="p-3.5 bg-emerald-500/20 text-emerald-300 rounded-2xl border border-emerald-500/40 shrink-0">
+                <Truck className="w-6 h-6 animate-pulse" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black uppercase tracking-widest bg-emerald-500/30 text-emerald-300 px-2.5 py-0.5 rounded-full border border-emerald-500/40">
+                    {activeDelivery ? "ACTIVE MISSION IN PROGRESS" : "NEW JOB DISPATCHED"}
+                  </span>
+                  <span className="text-xs font-mono text-emerald-200">
+                    #{(activeDelivery || pendingJob).orderId}
+                  </span>
+                </div>
+                <h3 className="text-base font-black text-white">
+                  Consignment: {Array.isArray((activeDelivery || pendingJob).items) ? (activeDelivery || pendingJob).items.join(", ") : ((activeDelivery || pendingJob).items || "Package")}
+                </h3>
+                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-300 pt-1 font-medium">
+                  <span>📍 Origin: {(activeDelivery || pendingJob).deliveryFrom || "Main Hub"}</span>
+                  <span>→</span>
+                  <span className="font-bold text-emerald-200">🏁 Destination: {(activeDelivery || pendingJob).deliveryTo || "Customer Point"}</span>
+                  <span className="ml-2 font-mono font-bold text-amber-300">Reward: ₹{((activeDelivery || pendingJob).amount || 120).toLocaleString("en-IN")}</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 w-full md:w-auto shrink-0">
+              {pendingJob && !activeDelivery ? (
+                <>
+                  <button
+                    onClick={handleRejectJob}
+                    className="flex-1 md:flex-none px-4 py-2.5 rounded-xl border border-rose-400/40 text-rose-300 text-xs font-black uppercase tracking-wider hover:bg-rose-900/30 transition cursor-pointer"
+                  >
+                    Decline
+                  </button>
+                  <button
+                    onClick={handleAcceptJob}
+                    className="flex-1 md:flex-none px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black uppercase tracking-wider transition cursor-pointer shadow-lg font-mono"
+                  >
+                    Accept Mission
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={handleMarkDelivered}
+                  className="w-full md:w-auto px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black uppercase tracking-wider transition cursor-pointer shadow-lg font-mono flex items-center justify-center gap-2"
+                >
+                  <CheckCircle className="w-4 h-4" /> Mark Completed
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* KPI Cards Row */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <KpiCard
@@ -386,6 +526,7 @@ export default function DashboardHome({ user, onLogout }) {
                     <Marker
                       key={d.id}
                       position={[lat, lng]}
+                      icon={getDriverVehicleIcon(d)}
                       eventHandlers={{ click: () => setSelectedDriver(d) }}
                     >
                       <Popup>

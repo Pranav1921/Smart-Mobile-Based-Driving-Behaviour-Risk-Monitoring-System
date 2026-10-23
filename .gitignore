@@ -1,13 +1,20 @@
 # Flutter & Android
 .dart_tool/
+**/.dart_tool/
 .packages
 build/
+**/build/
 MobileApp/build/
 MobileApp/android/.gradle/
 MobileApp/android/app/build/
 MobileApp/android/.kotlin/
+mobile-app/.dart_tool/
+mobile-app/build/
+mobile-app/android/.gradle/
+mobile-app/android/app/build/
 *.log
 hs_err_pid*.log
+install.cmd
 
 # Python
 __pycache__/

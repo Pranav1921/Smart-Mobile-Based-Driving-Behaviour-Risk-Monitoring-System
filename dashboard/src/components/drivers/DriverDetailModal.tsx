@@ -11,6 +11,7 @@ import { Driver } from '@/types'
 import { Avatar } from '@/components/ui/Avatar'
 import { Badge } from '@/components/ui/Badge'
 import { AreaLineChart } from '@/components/charts/Charts'
+import { Vehicle3DVisualizer } from '@/components/charts/Vehicle3DVisualizer'
 import { cn } from '@/lib/utils'
 import { useSocket } from '@/hooks/SocketContext'
 import { fetchNearbyEmergencyPlaces, EmergencyPlace } from '@/lib/emergencyServices'
@@ -47,6 +48,46 @@ export function DriverDetailModal({ driver, initialTab = 'telemetry', onClose }:
   const [profileDetails, setProfileDetails] = useState<any>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [showRelayModal, setShowRelayModal] = useState(false)
+  const [activeAssignedOrder, setActiveAssignedOrder] = useState<any>(null)
+
+  useEffect(() => {
+    if (!driver) return;
+    const fetchDriverOrder = async () => {
+      try {
+        const host = window.location.hostname === 'localhost' ? 'localhost:3000' : `${window.location.hostname}:3000`;
+        const res = await fetch(`http://${host}/api/v1/orders`);
+        if (res.ok) {
+          const json = await res.json();
+          const allOrders = json.data || [];
+          const drvId = (driver.id || '').toLowerCase();
+          const drvUserId = ((driver as any).userId || '').toLowerCase();
+          const drvEmpId = ((driver as any).employeeId || '').toLowerCase();
+          const drvName = (driver.name || '').toLowerCase().trim();
+
+          const matched = allOrders.find((o: any) => {
+            const oDrvId = (o.assignedDriverId || '').toLowerCase();
+            const oDrvName = (o.assignedDriverName || '').toLowerCase().trim();
+            const isAssigned = o.status === 'ASSIGNED';
+            if (!isAssigned) return false;
+            return (
+              (drvId && oDrvId === drvId) ||
+              (drvUserId && oDrvId === drvUserId) ||
+              (drvEmpId && oDrvId === drvEmpId) ||
+              (drvName && oDrvName && (drvName.includes(oDrvName) || oDrvName.includes(drvName)))
+            );
+          });
+          if (matched) {
+            setActiveAssignedOrder(matched);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch assigned order for driver modal:', err);
+      }
+    };
+    fetchDriverOrder();
+    const interval = setInterval(fetchDriverOrder, 3000);
+    return () => clearInterval(interval);
+  }, [driver]);
 
   useEffect(() => {
     if (driver?.id) {
@@ -146,11 +187,13 @@ export function DriverDetailModal({ driver, initialTab = 'telemetry', onClose }:
   const isPingTimedOut = pingState?.timedOut === true || (pingSent && countdown === 0 && !isPingResponded) || (countdown === 0 && !isPingResponded)
   const isEmergencyIncident = driver.status === 'emergency' || (crashAlertDriver && (crashAlertDriver.driverId === driver.id || crashAlertDriver.id === driver.id || crashAlertDriver.driverId === driver.userId))
 
+  const orderToUse = activeAssignedOrder || (driver as any).activeOrder;
+
   const isOnDelivery = Boolean(
+    orderToUse ||
     driver.deliveryTo ||
     driver.orderItems ||
     driver.destLat != null ||
-    (driver as any).activeOrder ||
     driver.status === 'delivery'
   )
 
@@ -380,13 +423,23 @@ export function DriverDetailModal({ driver, initialTab = 'telemetry', onClose }:
 
           {/* Content */}
           <div className="flex-1 p-6 md:p-8 flex flex-col min-w-0 overflow-hidden">
-            <div className="flex gap-4 md:gap-6 mb-6 border-b border-slate-800 shrink-0 flex-wrap">
-              <TabBtn active={activeTab === 'telemetry'} onClick={() => setActiveTab('telemetry')} label="Live Telemetry" />
-              <TabBtn active={activeTab === 'dossier'} onClick={() => setActiveTab('dossier')} label="Personal & Guardian Dossier" />
-              <TabBtn active={activeTab === 'deliveries'} onClick={() => setActiveTab('deliveries')} label="Delivery Details" badge={isOnDelivery} />
-              <TabBtn active={activeTab === 'phyd'} onClick={() => setActiveTab('phyd')} label="PHYD Insurance & Cost Burn (₹)" />
-              <TabBtn active={activeTab === 'dashcam'} onClick={() => setActiveTab('dashcam')} label="Locked Dashcam Evidence" badge={!!latestLockedEvidence} />
-              <TabBtn active={activeTab === 'crisis'} onClick={() => setActiveTab('crisis')} label="Emergency Protocol & 70/30 Relay" badge={driver.status === 'emergency'} />
+            <div className="flex items-center justify-between gap-4 md:gap-6 mb-6 border-b border-slate-800 shrink-0 pb-3">
+              <div className="flex gap-2 md:gap-4 flex-wrap flex-1">
+                <TabBtn active={activeTab === 'telemetry'} onClick={() => setActiveTab('telemetry')} label="Live Telemetry" />
+                <TabBtn active={activeTab === 'dossier'} onClick={() => setActiveTab('dossier')} label="Personal & Guardian Dossier" />
+                <TabBtn active={activeTab === 'deliveries'} onClick={() => setActiveTab('deliveries')} label="Delivery Details" badge={isOnDelivery} />
+                <TabBtn active={activeTab === 'phyd'} onClick={() => setActiveTab('phyd')} label="PHYD Insurance & Cost Burn (₹)" />
+                <TabBtn active={activeTab === 'dashcam'} onClick={() => setActiveTab('dashcam')} label="Locked Dashcam Evidence" badge={!!latestLockedEvidence} />
+                <TabBtn active={activeTab === 'crisis'} onClick={() => setActiveTab('crisis')} label="Emergency Protocol & 70/30 Relay" badge={driver.status === 'emergency'} />
+              </div>
+              <button
+                onClick={onClose}
+                className="text-slate-400 hover:text-white py-1.5 px-3 rounded-xl bg-slate-900 border border-slate-700/60 hover:bg-slate-800 transition cursor-pointer text-xs font-bold flex items-center gap-1.5 shrink-0 active:scale-95 shadow-md"
+                title="Close Window (Esc)"
+              >
+                <span>✕</span>
+                <span className="text-[10px] uppercase font-mono tracking-wider">Close</span>
+              </button>
             </div>
 
             <div className="flex-1 overflow-y-auto no-scrollbar space-y-6">
@@ -645,23 +698,28 @@ export function DriverDetailModal({ driver, initialTab = 'telemetry', onClose }:
                               {isOnDelivery ? "Active Delivery Mission" : "No Active Mission"}
                             </span>
                             {isOnDelivery && (
-                              <span className="px-3 py-0.5 rounded-full text-[9px] font-black tracking-widest uppercase bg-emerald-500 text-slate-950 animate-pulse">
+                              <span className="px-3 py-0.5 rounded-full text-[9px] font-black tracking-widest uppercase bg-emerald-500 text-slate-950 animate-pulse font-mono">
                                 ON DELIVERY
+                              </span>
+                            )}
+                            {orderToUse?.id && (
+                              <span className="px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                                #{orderToUse.id}
                               </span>
                             )}
                           </div>
                           <p className="text-xs text-slate-400 mt-0.5">
-                            Real-time live consignment and waypoint tracking
+                            {orderToUse ? `Customer: ${orderToUse.customerName || 'Direct'} • Compensation: ₹${orderToUse.amount || 120}` : 'Real-time live consignment and waypoint tracking'}
                           </p>
                         </div>
                       </div>
 
-                      {driver.destLat != null && driver.destLng != null && (
+                      {((orderToUse?.deliveryLocation?.latitude != null && orderToUse?.deliveryLocation?.longitude != null) || (driver.destLat != null && driver.destLng != null)) && (
                         <a
-                          href={`https://www.google.com/maps/dir/?api=1&destination=${driver.destLat},${driver.destLng}&travelmode=driving`}
+                          href={`https://www.google.com/maps/dir/?api=1&destination=${orderToUse?.deliveryLocation?.latitude ?? driver.destLat},${orderToUse?.deliveryLocation?.longitude ?? driver.destLng}&travelmode=driving`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-black text-xs uppercase tracking-wider flex items-center gap-1.5 transition"
+                          className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-black text-xs uppercase tracking-wider flex items-center gap-1.5 transition shadow-lg"
                         >
                           <span>Open Navigation</span>
                           <ExternalLink size={12} />
@@ -677,10 +735,12 @@ export function DriverDetailModal({ driver, initialTab = 'telemetry', onClose }:
                           <span>What He Is Delivering</span>
                         </div>
                         <div className="text-base font-extrabold text-white">
-                          {driver.orderItems || (isOnDelivery ? 'Tactical Delivery Package #ORD-701' : 'None')}
+                          {orderToUse?.items 
+                            ? (Array.isArray(orderToUse.items) ? orderToUse.items.join(', ') : orderToUse.items)
+                            : (driver.orderItems || (isOnDelivery ? 'Express Consignment Package' : 'None'))}
                         </div>
                         <p className="text-[11px] text-slate-400 mt-1">
-                          Assigned Consignment
+                          {orderToUse?.customerName ? `Ordered by ${orderToUse.customerName}` : 'Assigned Consignment'}
                         </p>
                       </div>
 
@@ -691,7 +751,7 @@ export function DriverDetailModal({ driver, initialTab = 'telemetry', onClose }:
                           <span>From Who (Pickup Location)</span>
                         </div>
                         <div className="text-base font-extrabold text-white">
-                          {driver.deliveryFrom || 'Main Logistics Depot, Puttur'}
+                          {orderToUse?.deliveryFrom || driver.deliveryFrom || 'Main Logistics Depot, Puttur'}
                         </div>
                         <p className="text-[11px] text-slate-400 mt-1">
                           Merchant / Origin Hub
@@ -705,12 +765,14 @@ export function DriverDetailModal({ driver, initialTab = 'telemetry', onClose }:
                           <span>To Where (Destination)</span>
                         </div>
                         <div className="text-base font-extrabold text-white">
-                          {driver.deliveryTo || (isOnDelivery ? 'Customer Delivery Address' : 'None')}
+                          {orderToUse?.deliveryLocation?.address || driver.deliveryTo || (isOnDelivery ? 'Customer Delivery Address' : 'None')}
                         </div>
                         <p className="text-[11px] text-slate-400 mt-1 font-mono">
-                          {driver.destLat != null && driver.destLng != null
-                            ? `Coordinates: [${driver.destLat.toFixed(4)}, ${driver.destLng.toFixed(4)}]`
-                            : 'Customer Delivery Point'}
+                          {orderToUse?.deliveryLocation?.latitude != null
+                            ? `Coordinates: [${Number(orderToUse.deliveryLocation.latitude).toFixed(4)}, ${Number(orderToUse.deliveryLocation.longitude).toFixed(4)}]`
+                            : (driver.destLat != null && driver.destLng != null
+                              ? `Coordinates: [${driver.destLat.toFixed(4)}, ${driver.destLng.toFixed(4)}]`
+                              : 'Customer Delivery Point')}
                         </p>
                       </div>
                     </div>
@@ -939,6 +1001,15 @@ export function DriverDetailModal({ driver, initialTab = 'telemetry', onClose }:
                     </div>
                     <AreaLineChart labels={telemetryHistory.labels} series={[{ name: 'G-Force', data: telemetryHistory.gForce, color: '#00FF9D' }]} height={170} />
                   </div>
+
+                  {/* 3D VEHICLE ATTITUDE & IMPACT VISUALIZER */}
+                  <Vehicle3DVisualizer
+                    pitch={driver.gyroX ? Number((driver.gyroX * 57.3).toFixed(1)) : -2.5}
+                    roll={driver.gyroY ? Number((driver.gyroY * 57.3).toFixed(1)) : 1.2}
+                    yaw={driver.heading || 35}
+                    impactLocation={driver.status === 'emergency' ? 'front' : 'none'}
+                    impactGForce={driver.vibrationRate || (driver.status === 'emergency' ? 3.85 : 0.8)}
+                  />
                 </div>
               )}
 

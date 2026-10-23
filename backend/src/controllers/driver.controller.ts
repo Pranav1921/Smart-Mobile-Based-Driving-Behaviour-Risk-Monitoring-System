@@ -160,12 +160,14 @@ export class DriverController {
           );
         });
 
-        if (live) {
+        const isLiveOnline = Boolean(live && live.isOnline && live.status !== 'offline');
+
+        if (isLiveOnline && live) {
           return {
             ...d,
-            status: live.status, // Preserve live status (safe, warning, emergency, etc.)
+            status: live.status,
             safetyScore: live.safetyScore ?? d.safetyScore,
-            speed: live.speed,
+            speed: live.speed ?? 0,
             latitude: live.latitude,
             longitude: live.longitude,
             lastSeen: live.lastSeen,
@@ -175,7 +177,13 @@ export class DriverController {
             trips: live.trips ?? (d as any).trips ?? 0,
           };
         }
-        return d;
+
+        return {
+          ...d,
+          status: 'offline',
+          isOnline: false,
+          speed: 0,
+        };
       });
 
       res.status(200).json({

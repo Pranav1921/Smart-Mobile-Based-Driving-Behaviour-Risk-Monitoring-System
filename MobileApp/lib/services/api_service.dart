@@ -490,8 +490,14 @@ class ApiService {
     return [];
   }
 
+  // Fetch all delivery orders (including assigned and pending)
   static Future<List<DeliveryOrder>> fetchOrders() async {
-    return fetchPendingOrders();
+    final response = await _request("/orders", method: "GET");
+    if (response != null && response['data'] != null) {
+      final List list = response['data'];
+      return list.map((json) => DeliveryOrder.fromJson(Map<String, dynamic>.from(json))).toList();
+    }
+    return [];
   }
 
   // Upload crash media (Video/Audio)

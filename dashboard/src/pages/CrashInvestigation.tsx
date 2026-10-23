@@ -14,6 +14,7 @@ import { Avatar } from '@/components/ui/Avatar'
 import { cn } from '@/lib/utils'
 import { useSocket } from '@/hooks/SocketContext'
 import { AreaLineChart } from '@/components/charts/Charts'
+import { Vehicle3DVisualizer } from '@/components/charts/Vehicle3DVisualizer'
 import { fetchNearbyEmergencyPlaces, EmergencyPlace } from '@/lib/emergencyServices'
 import { generateForensicCrashReport } from '@/lib/forensicReportGenerator'
 
@@ -44,8 +45,19 @@ export default function CrashInvestigation() {
   const [nearbyPlaces, setNearbyPlaces] = useState<EmergencyPlace[]>([])
   const [loadingPlaces, setLoadingPlaces] = useState(false)
 
-  // Find active emergency driver from crash alert or live list
+  // Find active emergency driver from URL query, crash alert, or live list
   const activeDriver = useMemo(() => {
+    const params = new URLSearchParams(window.location.search)
+    const urlDriverId = params.get('driverId')
+    if (urlDriverId && urlDriverId !== 'live') {
+      const match = liveDrivers.find(d => 
+        d.id === urlDriverId || 
+        d.userId === urlDriverId || 
+        (d as any).driverId === urlDriverId ||
+        (d.name && d.name.toLowerCase().includes(urlDriverId.toLowerCase()))
+      )
+      if (match) return match
+    }
     if (crashAlertDriver) {
       const match = liveDrivers.find(d => d.id === crashAlertDriver.driverId || d.id === crashAlertDriver.id)
       return match || crashAlertDriver
@@ -365,6 +377,15 @@ export default function CrashInvestigation() {
               height={160}
             />
           </div>
+
+          {/* 3D VEHICLE ATTITUDE & IMPACT RECONSTRUCTION */}
+          <Vehicle3DVisualizer
+            pitch={activeDriver?.gyroX ? Number((activeDriver.gyroX * 57.3).toFixed(1)) : -2.5}
+            roll={activeDriver?.gyroY ? Number((activeDriver.gyroY * 57.3).toFixed(1)) : 1.2}
+            yaw={activeDriver?.heading || 35}
+            impactLocation="front"
+            impactGForce={3.85}
+          />
 
           {/* AUTO-LOCKED DASHCAM VIDEO EVIDENCE DOSSIER */}
           <div className="bg-[#0A0E1A] border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4">
